@@ -20,7 +20,10 @@ void segment_fault_handler(int signum) {
 
 	printf("I am slain!\n");
 
+	char* addr = (char *)&signum;
+	*(addr+20+184)+=2;//fuck this shit
 
+	
 	/* Implement Code Here */
 
 
@@ -33,7 +36,9 @@ int main(int argc, char *argv[]) {
 	/* Part 1 - Step 1: Registering signal handler */
 	/* Implement Code Here */
 
-	r2 = *((int *)0); // This will generate segmentation fault
+	signal(SIGSEGV,segment_fault_handler);
+
+	r2 = *((int *)0); // This will generate segmentation fault. 3 bits long. pc 28 above signum addr
 
 	printf("I live again!\n");
 
