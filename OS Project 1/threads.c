@@ -36,7 +36,9 @@ void *inc_shared_counter(void *arg) {
 		/* Part 2: Modify the code within this for loop to
 				   allow for synchonized incrementing of x
 				   between the two threads */
+		pthread_mutex_lock(&mutex);
 		x = x + 1;
+		pthread_mutex_unlock(&mutex);
 
 	}
 
@@ -64,10 +66,12 @@ int main(int argc, char *argv[]) {
 	// Part 1: create two threads and have them
 	// run the inc_shared_counter function()
 	/* Implement Code Here */
+	pthread_mutex_init(&mutex, NULL);
 	pthread_create(&t1, NULL, inc_shared_counter, NULL);
 	pthread_create(&t2, NULL, inc_shared_counter, NULL);
 	pthread_join(t2,NULL);
 	pthread_join(t1,NULL);
+	pthread_mutex_destroy(&mutex);
 
 
 	printf("The final value of x is %d\n", x);
