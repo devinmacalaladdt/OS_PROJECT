@@ -1,7 +1,7 @@
 /* syscall.c
  *
  * Group Members Names and NetIDs:
- *   1. Devin Malacalad (dtm)
+ *   1. Devin Macalalad (dtm)
  *   2. David Gasperini (dlg195)
  *
  * ILab Machine Tested on:
