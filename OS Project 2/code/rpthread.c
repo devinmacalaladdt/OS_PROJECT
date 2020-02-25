@@ -133,4 +133,54 @@ static void sched_mlfq() {
 // Feel free to add any other functions you need
 
 // YOUR CODE HERE
+void setup_runqueue(runqueue * rq){
 
+	rq->size=0;
+	rq->head = NULL;
+	rq->tail = NULL;
+
+}
+
+tcb *peek(runqueue * rq){
+
+	return (rq->head)->t;
+
+}
+
+void enqueue(runqueue * rq, tcb * t){
+
+	if(rq->head==NULL){
+
+		rq->head = (tcb_node*)(malloc(sizeof(tcb_node)));
+		(rq->head)->t = t;
+		(rq->head)->next = NULL;
+		rq->tail = rq->head;
+		rq->size++;
+		return;
+
+	}
+
+	(rq->tail)->next = (tcb_node*)(malloc(sizeof(tcb_node)));
+	((rq->tail)->next)->t = t;
+	rq->tail = (rq->tail)->next;
+	rq->size++;
+
+}
+
+tcb *dequeue(runqueue * rq){
+
+	if(rq->head==NULL){
+
+		return NULL;
+
+	}
+
+	tcb *tmp = (rq->head)->t;
+	tcb_node *tmp2 = rq->head;
+	rq->head = (rq->head)->next;
+	free(tmp2);
+	rq->size--;
+	return tmp;
+
+
+}

@@ -43,7 +43,26 @@ typedef struct rpthread_mutex_t {
 /* define your data structures here: */
 // Feel free to add your own auxiliary data structures (linked list or queue etc...)
 
-// YOUR CODE HERE
+
+typedef struct tcb_nodes{
+
+	tcb *t;
+	struct tcb_nodes *next;
+
+}tcb_node;
+
+typedef struct runqueues{
+
+	tcb_node *head;
+	tcb_node *tail;
+	int size;
+
+}runqueue;
+
+void setup_runqueue(runqueue * rq);
+tcb *peek(runqueue * rq);
+void enqueue(runqueue * rq, tcb * t);
+tcb *dequeue(runqueue * rq);
 
 
 /* Function Declarations: */
