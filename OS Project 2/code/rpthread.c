@@ -10,15 +10,19 @@
 // YOUR CODE HERE
 
 
-/* create a new thread */
-int rpthread_create(rpthread_t * thread, pthread_attr_t * attr, 
-                      void *(*function)(void*), void * arg) {
-       // Create Thread Control Block
-       // Create and initialize the context of this thread
-       // Allocate space of stack for this thread to run
-       // after everything is all set, push this thread int
-       // YOUR CODE HERE
-	
+/* create a new thread
+* return 0 for success, 1 for error
+*/
+int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
+	void *(*function)(void*), void * arg) {
+	// Create Thread Control Block
+	// Create and initialize the context of this thread
+	// Allocate space of stack for this thread to run
+	// after everything is all set, push this thread int
+	// YOUR CODE HERE
+	tcb * tcb = initializeTCB();
+	if (tcb == NULL)
+		return 1;
     return 0;
 };
 

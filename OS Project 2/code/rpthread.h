@@ -18,20 +18,65 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <ucontext.h>
+#include <string.h>
+#include <sys/time.h>
 
 typedef uint rpthread_t;
+
+//Constants
+enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3 }; //Initialization = set up structs but doesn't have a function to run
+
+//Highest available TiD (assumes no re-use)
+long openTiD = 0;
 
 typedef struct threadControlBlock {
 	/* add important states in a thread control block */
 	// thread Id
+	unsigned TiD;
+
 	// thread status
+	unsigned state;
+
 	// thread context
+	ucontext_t context;
+
 	// thread stack
+	void * stackPtr;
+
 	// thread priority
+	unsigned priority; //Realtime 0 - 99?
+
 	// And more ...
 
 	// YOUR CODE HERE
-} tcb; 
+} tcb;
+
+/*
+* Return a pointer to the initialized TCB
+* Null for error
+*/
+tcb * initializeTCB() {
+	tcb * tcb = malloc(sizeof(tcb));
+	if (tcb == NULL)
+		return NULL;
+	tcb->TiD = openTiD++;
+	tcb->priority = DEFAULT_PRIORITY;
+	stackPtr = (void *)malloc(SIGSTKSZ);
+	if (stackPtr == NULL)
+		return NULL;
+	tcb->stackPtr = stackPtr;
+	ucontext_t context;
+	if (getcontext(&context) < 0)
+		return NULL;
+	context.uc_link = NULL;
+	context.uc_stack.ss_sp = stackPtr;
+	context.uc_stack.ss_size = SIGSTKSZ;
+	context.uc_stack.ss_flags = 0;
+	tcb->context = context;
+	tcb->state = INITIALIZATION;
+}
 
 /* mutex struct definition */
 typedef struct rpthread_mutex_t {
