@@ -53,30 +53,6 @@ typedef struct threadControlBlock {
 	// YOUR CODE HERE
 } tcb;
 
-/*
-* Return a pointer to the initialized TCB
-* Null for error
-*/
-tcb * initializeTCB() {
-	tcb * tcb = malloc(sizeof(tcb));
-	if (tcb == NULL)
-		return NULL;
-	tcb->TiD = openTiD++;
-	tcb->priority = DEFAULT_PRIORITY;
-	stackPtr = (void *)malloc(SIGSTKSZ);
-	if (stackPtr == NULL)
-		return NULL;
-	tcb->stackPtr = stackPtr;
-	ucontext_t context;
-	if (getcontext(&context) < 0)
-		return NULL;
-	context.uc_link = NULL;
-	context.uc_stack.ss_sp = stackPtr;
-	context.uc_stack.ss_size = SIGSTKSZ;
-	context.uc_stack.ss_flags = 0;
-	tcb->context = context;
-	tcb->state = INITIALIZATION;
-}
 
 /* mutex struct definition */
 typedef struct rpthread_mutex_t {
@@ -88,6 +64,7 @@ typedef struct rpthread_mutex_t {
 /* define your data structures here: */
 // Feel free to add your own auxiliary data structures (linked list or queue etc...)
 
+tcb * initializeTCB();
 
 typedef struct tcb_nodes{
 

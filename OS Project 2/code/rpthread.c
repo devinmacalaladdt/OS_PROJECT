@@ -13,6 +13,10 @@
 /* create a new thread
 * return 0 for success, 1 for error
 */
+
+runqueue * rq_ptr = NULL;
+runqueue rq;
+
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	void *(*function)(void*), void * arg) {
 	// Create Thread Control Block
@@ -20,9 +24,33 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	// Allocate space of stack for this thread to run
 	// after everything is all set, push this thread int
 	// YOUR CODE HERE
-	tcb * tcb = initializeTCB();
-	if (tcb == NULL)
+	tcb * _tcb = initializeTCB();
+	if (_tcb == NULL)
 		return 1;
+	if(rq_ptr==NULL){
+		rq_ptr = (runqueue*)(malloc(sizeof(runqueue)));
+		setup_runqueue(rq_ptr);
+		rq = *rq_ptr;
+		struct sigaction sa;
+		memset (&sa, 0, sizeof (sa));
+		sa.sa_handler = &schedule;
+		sigaction (SIGPROF, &sa, NULL);
+
+		struct itimerval timer;
+
+		timer.it_interval.tv_usec = 5000;
+		timer.it_interval.tv_sec = 0;
+
+		timer.it_value.tv_usec = 0;
+		timer.it_value.tv_sec = 5000;
+
+		setitimer(ITIMER_PROF, &timer, NULL);
+	}
+	makecontext(_tcb->stackPtr,function,1,void*);
+	_tcb->state = READY;
+	enqueue(rq_ptr);
+
+
     return 0;
 };
 
@@ -109,6 +137,9 @@ static void schedule() {
 
 	// YOUR CODE HERE
 
+
+
+
 // schedule policy
 #ifndef MLFQ
 	// Choose STCF
@@ -137,6 +168,32 @@ static void sched_mlfq() {
 // Feel free to add any other functions you need
 
 // YOUR CODE HERE
+
+/*
+* Return a pointer to the initialized TCB
+* Null for error
+*/
+tcb * initializeTCB() {
+	tcb * tcb = malloc(sizeof(tcb));
+	if (tcb == NULL)
+		return NULL;
+	tcb->TiD = openTiD++;
+	tcb->priority = DEFAULT_PRIORITY;
+	stackPtr = (void *)malloc(SIGSTKSZ);
+	if (stackPtr == NULL)
+		return NULL;
+	tcb->stackPtr = stackPtr;
+	ucontext_t context;
+	if (getcontext(&context) < 0)
+		return NULL;
+	context.uc_link = NULL;
+	context.uc_stack.ss_sp = stackPtr;
+	context.uc_stack.ss_size = SIGSTKSZ;
+	context.uc_stack.ss_flags = 0;
+	tcb->context = context;
+	tcb->state = INITIALIZATION;
+}
+
 void setup_runqueue(runqueue * rq){
 
 	rq->size=0;
