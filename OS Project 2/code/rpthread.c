@@ -48,7 +48,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	}
 	makecontext(_tcb->stackPtr,function,1,void*);
 	_tcb->state = READY;
-	enqueue(rq_ptr);
+	enqueue(rq_ptr,_tcb);
 
 
     return 0;
