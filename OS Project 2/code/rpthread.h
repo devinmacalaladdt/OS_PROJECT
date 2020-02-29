@@ -28,13 +28,11 @@ typedef uint rpthread_t;
 //Constants
 enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3 }; //Initialization = set up structs but doesn't have a function to run
 
-//Highest available TiD (assumes no re-use)
-long openTiD = 0;
 
 typedef struct threadControlBlock {
 	/* add important states in a thread control block */
 	// thread Id
-	unsigned TiD;
+	rpthread_t TiD;
 
 	// thread status
 	unsigned state;

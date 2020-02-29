@@ -8,14 +8,14 @@
 
 // INITAILIZE ALL YOUR VARIABLES HERE
 // YOUR CODE HERE
-
-
+//Highest available TiD (assumes no re-use)
+rpthread_t openTiD = 0;
+runqueue * rq_ptr = NULL;
+runqueue rq;
 /* create a new thread
 * return 0 for success, 1 for error
 */
 
-runqueue * rq_ptr = NULL;
-runqueue rq;
 
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	void *(*function)(void*), void * arg) {
@@ -174,15 +174,15 @@ static void sched_mlfq() {
 * Null for error
 */
 tcb * initializeTCB() {
-	tcb * tcb = malloc(sizeof(tcb));
-	if (tcb == NULL)
+	tcb * _tcb = malloc(sizeof(tcb));
+	if (_tcb == NULL)
 		return NULL;
-	tcb->TiD = openTiD++;
-	tcb->priority = DEFAULT_PRIORITY;
+	_tcb->TiD = openTiD++;
+	_tcb->priority = DEFAULT_PRIORITY;
 	stackPtr = (void *)malloc(SIGSTKSZ);
 	if (stackPtr == NULL)
 		return NULL;
-	tcb->stackPtr = stackPtr;
+	_tcb->stackPtr = stackPtr;
 	ucontext_t context;
 	if (getcontext(&context) < 0)
 		return NULL;
@@ -190,8 +190,9 @@ tcb * initializeTCB() {
 	context.uc_stack.ss_sp = stackPtr;
 	context.uc_stack.ss_size = SIGSTKSZ;
 	context.uc_stack.ss_flags = 0;
-	tcb->context = context;
-	tcb->state = INITIALIZATION;
+	_tcb->context = context;
+	_tcb->state = INITIALIZATION;
+	return _tcb;
 }
 
 void setup_runqueue(runqueue * rq){
