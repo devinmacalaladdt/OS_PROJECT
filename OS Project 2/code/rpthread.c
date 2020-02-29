@@ -46,7 +46,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 
 		setitimer(ITIMER_PROF, &timer, NULL);
 	}
-	makecontext(_tcb->stackPtr,function,1,void*);
+	makecontext(_tcb->stackPtr,(void(*)())function,1,arg);
 	_tcb->state = READY;
 	enqueue(rq_ptr,_tcb);
 
