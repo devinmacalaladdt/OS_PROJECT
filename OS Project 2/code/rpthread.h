@@ -83,6 +83,7 @@ void setup_runqueue(runqueue * rq);
 tcb *peek(runqueue * rq);
 void enqueue(runqueue * rq, tcb * t);
 tcb *dequeue(runqueue * rq);
+void handler(int signum);
 
 
 /* Function Declarations: */

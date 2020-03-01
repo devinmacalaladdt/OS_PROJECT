@@ -9,6 +9,7 @@
 // INITAILIZE ALL YOUR VARIABLES HERE
 // YOUR CODE HERE
 //Highest available TiD (assumes no re-use)
+ucontext_t sched_context;
 rpthread_t openTiD = 0;
 runqueue * rq_ptr = NULL;
 runqueue rq;
@@ -26,14 +27,26 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	// YOUR CODE HERE
 	tcb * _tcb = initializeTCB();
 	if (_tcb == NULL)
-		return 1;
+		return -1;
 	if(rq_ptr==NULL){
 		rq_ptr = (runqueue*)(malloc(sizeof(runqueue)));
 		setup_runqueue(rq_ptr);
 		rq = *rq_ptr;
+
+		void *stackPtr = (void *)malloc(SIGSTKSZ);
+		if (stackPtr == NULL)
+			return -1;
+		if (getcontext(&sched_context) < 0)
+			return -1;
+		sched_context.uc_link = NULL;
+		sched_context.uc_stack.ss_sp = stackPtr;
+		sched_context.uc_stack.ss_size = SIGSTKSZ;
+		sched_context.uc_stack.ss_flags = 0;
+		makecontext(&sched_context,(void *)&schedule,0);
+
 		struct sigaction sa;
 		memset (&sa, 0, sizeof (sa));
-		sa.sa_handler = &schedule;
+		sa.sa_handler = &handler;
 		sigaction (SIGPROF, &sa, NULL);
 
 		struct itimerval timer;
@@ -60,7 +73,8 @@ int rpthread_yield() {
 	// Change thread state from Running to Ready
 	// Save context of this thread to its thread control block
 	// switch from thread context to scheduler context
-
+	((rq_ptr->head)->t)->state=READY;
+	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
 	// YOUR CODE HERE
 	return 0;
 };
@@ -179,7 +193,7 @@ tcb * initializeTCB() {
 		return NULL;
 	_tcb->TiD = openTiD++;
 	_tcb->priority = DEFAULT_PRIORITY;
-	stackPtr = (void *)malloc(SIGSTKSZ);
+	void* stackPtr = (void *)malloc(SIGSTKSZ);
 	if (stackPtr == NULL)
 		return NULL;
 	_tcb->stackPtr = stackPtr;
@@ -244,5 +258,11 @@ tcb *dequeue(runqueue * rq){
 	rq->size--;
 	return tmp;
 
+
+}
+
+void handler(int signum){
+
+	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
 
 }
