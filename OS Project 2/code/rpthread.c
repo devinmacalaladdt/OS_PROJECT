@@ -150,6 +150,13 @@ static void schedule() {
 	// 		sched_mlfq();
 
 	// YOUR CODE HERE
+	enqueue(rq_ptr,dequeue(rq_ptr));
+	while(peek(rq_ptr)->state!=RUNNING){
+
+		enqueue(rq_ptr,dequeue(rq_ptr));
+
+	}
+	swapcontext(&sched_context,&((peek(rq_ptr))->context));
 
 
 
