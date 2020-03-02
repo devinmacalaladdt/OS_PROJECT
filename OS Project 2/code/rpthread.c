@@ -13,6 +13,7 @@ ucontext_t sched_context;
 rpthread_t openTiD = 0;
 runqueue * rq_ptr = NULL;
 runqueue rq;
+static void schedule();
 /* create a new thread
 * return 0 for success, 1 for error
 */
@@ -199,7 +200,7 @@ tcb * initializeTCB() {
 	if (_tcb == NULL)
 		return NULL;
 	_tcb->TiD = openTiD++;
-	_tcb->priority = DEFAULT_PRIORITY;
+	_tcb->priority = INITIALIZATION;
 	void* stackPtr = (void *)malloc(SIGSTKSZ);
 	if (stackPtr == NULL)
 		return NULL;
