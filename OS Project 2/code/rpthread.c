@@ -58,10 +58,21 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		timer.it_value.tv_usec = 1;
 		timer.it_value.tv_sec = 0;
 
+		tcb * _tcb2 = malloc(sizeof(tcb));
+		_tcb2->TiD = openTiD++;
+		_tcb2->state = RUNNING;
+		enqueue(rq_ptr,_tcb2);
+
+
+		makecontext(&(_tcb->context),(void(*)())function,1,arg);
+		_tcb->state = READY;
+		enqueue(rq_ptr,_tcb);
+
 		setitimer(ITIMER_PROF, &timer, NULL);
+		return 0;
 	}
 	makecontext(&(_tcb->context),(void(*)())function,1,arg);
-	_tcb->state = RUNNING;
+	_tcb->state = READY;
 	enqueue(rq_ptr,_tcb);
 
 
@@ -151,13 +162,20 @@ static void schedule() {
 	// 		sched_mlfq();
 
 	// YOUR CODE HERE
+
+	if(((rq_ptr->head)->t)->state==RUNNING){
+
+		((rq_ptr->head)->t)->state = READY;
+
+	}
 	enqueue(rq_ptr,dequeue(rq_ptr));
-	while(peek(rq_ptr)->state!=RUNNING){
+	while(peek(rq_ptr)->state!=READY){
 
 		enqueue(rq_ptr,dequeue(rq_ptr));
 
 	}
-	swapcontext(&sched_context,&((peek(rq_ptr))->context));
+	((rq_ptr->head)->t)->state = RUNNING;
+	setcontext(&((peek(rq_ptr))->context));
 
 
 

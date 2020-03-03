@@ -19,7 +19,7 @@ void* foo(void * args){
 	}
 
 }
-void bar(){
+void * bar(void * args){
 
 	while(1){
 
@@ -31,8 +31,10 @@ void bar(){
 int main(int argc, char **argv) {
 
 	rpthread_t thread_id; 
+	rpthread_t thread_id2; 
     printf("Before Thread\n"); 
     pthread_create(&thread_id, NULL, foo, NULL); 
+    pthread_create(&thread_id2, NULL, bar, NULL); 
 
     while(1){}
 	return 0;
