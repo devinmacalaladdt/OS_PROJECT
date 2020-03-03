@@ -55,13 +55,13 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		timer.it_interval.tv_usec = 5000;
 		timer.it_interval.tv_sec = 0;
 
-		timer.it_value.tv_usec = 0;
-		timer.it_value.tv_sec = 5000;
+		timer.it_value.tv_usec = 1;
+		timer.it_value.tv_sec = 0;
 
 		setitimer(ITIMER_PROF, &timer, NULL);
 	}
-	makecontext(_tcb->stackPtr,(void(*)())function,1,arg);
-	_tcb->state = READY;
+	makecontext(&(_tcb->context),(void(*)())function,1,arg);
+	_tcb->state = RUNNING;
 	enqueue(rq_ptr,_tcb);
 
 
@@ -247,6 +247,7 @@ void enqueue(runqueue * rq, tcb * t){
 	(rq->tail)->next = (tcb_node*)(malloc(sizeof(tcb_node)));
 	((rq->tail)->next)->t = t;
 	rq->tail = (rq->tail)->next;
+	(rq->tail)->next = rq->head;
 	rq->size++;
 
 }
@@ -262,6 +263,7 @@ tcb *dequeue(runqueue * rq){
 	tcb *tmp = (rq->head)->t;
 	tcb_node *tmp2 = rq->head;
 	rq->head = (rq->head)->next;
+	(rq->tail)->next = rq->head;
 	free(tmp2);
 	rq->size--;
 	return tmp;
