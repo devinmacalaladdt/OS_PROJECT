@@ -10,7 +10,7 @@
  * You can modify and use this program as much as possible.
  * This will not be graded.
  */
-void foo(){
+void* foo(void * args){
 
 	while(1){
 
