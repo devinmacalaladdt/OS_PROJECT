@@ -26,14 +26,16 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	// Allocate space of stack for this thread to run
 	// after everything is all set, push this thread int
 	// YOUR CODE HERE
-	tcb * _tcb = initializeTCB();
+	tcb * _tcb = initializeTCB(thread);
 	if (_tcb == NULL)
 		return -1;
 	if(rq_ptr==NULL){
+		//first thread, set up queue + timer
 		rq_ptr = (runqueue*)(malloc(sizeof(runqueue)));
 		setup_runqueue(rq_ptr);
 		rq = *rq_ptr;
 
+		//set up schedule context
 		void *stackPtr = (void *)malloc(SIGSTKSZ);
 		if (stackPtr == NULL)
 			return -1;
@@ -58,12 +60,15 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		timer.it_value.tv_usec = 1;
 		timer.it_value.tv_sec = 0;
 
-		tcb * _tcb2 = malloc(sizeof(tcb));
-		_tcb2->TiD = openTiD++;
-		_tcb2->state = RUNNING;
-		enqueue(rq_ptr,_tcb2);
+		//context of calling function created + queued
+		tcb * calling = malloc(sizeof(tcb));
+		calling->TiD = (rpthread_t*)malloc(sizeof(rpthread_t));
+		*(calling->TiD) = openTiD++;
+		//calling context already running
+		calling->state = RUNNING;
+		enqueue(rq_ptr,calling);
 
-
+		//specified context created + queued
 		makecontext(&(_tcb->context),(void(*)())function,1,arg);
 		_tcb->state = READY;
 		enqueue(rq_ptr,_tcb);
@@ -71,6 +76,8 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		setitimer(ITIMER_PROF, &timer, NULL);
 		return 0;
 	}
+
+	//specified context created + queued
 	makecontext(&(_tcb->context),(void(*)())function,1,arg);
 	_tcb->state = READY;
 	enqueue(rq_ptr,_tcb);
@@ -85,6 +92,7 @@ int rpthread_yield() {
 	// Change thread state from Running to Ready
 	// Save context of this thread to its thread control block
 	// switch from thread context to scheduler context
+	//set currently running to ready then context switch to scheduler
 	((rq_ptr->head)->t)->state=READY;
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
 	// YOUR CODE HERE
@@ -163,17 +171,21 @@ static void schedule() {
 
 	// YOUR CODE HERE
 
+	//If the current thread is running, set it to ready to be queued
 	if(((rq_ptr->head)->t)->state==RUNNING){
 
 		((rq_ptr->head)->t)->state = READY;
 
 	}
+	//dequeue current thread + enqueue it
 	enqueue(rq_ptr,dequeue(rq_ptr));
+	// keep enqueueing the dequeued thread until one is ready
 	while(peek(rq_ptr)->state!=READY){
 
 		enqueue(rq_ptr,dequeue(rq_ptr));
 
 	}
+	//set state to running and context switch in
 	((rq_ptr->head)->t)->state = RUNNING;
 	setcontext(&((peek(rq_ptr))->context));
 
@@ -213,11 +225,13 @@ static void sched_mlfq() {
 * Return a pointer to the initialized TCB
 * Null for error
 */
-tcb * initializeTCB() {
+tcb * initializeTCB(rpthread_t * thread) {
 	tcb * _tcb = malloc(sizeof(tcb));
 	if (_tcb == NULL)
 		return NULL;
-	_tcb->TiD = openTiD++;
+	*thread = openTiD++;
+	_tcb->TiD = (rpthread_t*)malloc(sizeof(rpthread_t));
+	*(_tcb->TiD) = *thread;
 	_tcb->priority = INITIALIZATION;
 	void* stackPtr = (void *)malloc(SIGSTKSZ);
 	if (stackPtr == NULL)
@@ -291,6 +305,7 @@ tcb *dequeue(runqueue * rq){
 
 void handler(int signum){
 
+	//save current thread and context switch to scheduler
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
 
 }

@@ -32,7 +32,7 @@ enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3 }; //Initia
 typedef struct threadControlBlock {
 	/* add important states in a thread control block */
 	// thread Id
-	rpthread_t TiD;
+	rpthread_t* TiD;
 
 	// thread status
 	unsigned state;
@@ -62,7 +62,7 @@ typedef struct rpthread_mutex_t {
 /* define your data structures here: */
 // Feel free to add your own auxiliary data structures (linked list or queue etc...)
 
-tcb * initializeTCB();
+tcb * initializeTCB(rpthread_t * thread);
 
 typedef struct tcb_nodes{
 
