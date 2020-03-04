@@ -66,12 +66,13 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		*(calling->TiD) = openTiD++;
 		//calling context already running
 		calling->state = RUNNING;
-		enqueue(rq_ptr,calling);
+
+		enqueue(rq_ptr,setup_tcb_node(calling));
 
 		//specified context created + queued
 		makecontext(&(_tcb->context),(void(*)())function,1,arg);
 		_tcb->state = READY;
-		enqueue(rq_ptr,_tcb);
+		enqueue(rq_ptr,setup_tcb_node(_tcb));
 
 		setitimer(ITIMER_PROF, &timer, NULL);
 		return 0;
@@ -80,7 +81,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	//specified context created + queued
 	makecontext(&(_tcb->context),(void(*)())function,1,arg);
 	_tcb->state = READY;
-	enqueue(rq_ptr,_tcb);
+	enqueue(rq_ptr,setup_tcb_node(_tcb));
 
 
     return 0;
@@ -112,6 +113,57 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	
 	// Wait for a specific thread to terminate
 	// De-allocate any dynamic memory created by the joining thread
+
+	//iterate through runqueue, look for desired thread
+	tcb_node * curr = rq_ptr->head;
+	do{
+
+		if(*((curr->t)->TiD)==thread){
+
+			//thread found. If no current threads are joined on it, start the list
+			if(curr->joined_on==NULL){
+
+				curr->joined_on = setup_tcb_node((rq_ptr->head)->t);
+				//set the joined_on_ret to value_ptr if its not null
+				if(value_ptr!=NULL){
+				
+					(curr->joined_on)->joined_on_ret = value_ptr;
+				
+				}
+
+
+			}else{
+
+				//thread found, already others joined on it, so add to back of list
+				tcb_node *curr2 = curr->joined_on;
+				while(curr2->next!=NULL){
+
+					curr2 = curr2->next;
+
+				}
+				curr2->next = setup_tcb_node((rq_ptr->head)->t);
+				//set the joined_on_ret to value_ptr if its not null
+				if(value_ptr!=NULL){
+
+					(curr2->next)->joined_on_ret = value_ptr;
+
+				}
+
+
+
+			}
+
+			break;
+
+		}
+
+		curr = curr->next;
+
+	}while(curr!=rq_ptr->head);
+
+	//set status of current thread to blocked and context switch to scheduler
+	((rq_ptr->head)->t)->state = BLOCKED;
+	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
   
 	// YOUR CODE HERE
 	return 0;
@@ -257,18 +309,28 @@ void setup_runqueue(runqueue * rq){
 
 }
 
+tcb_node * setup_tcb_node(tcb * t){
+
+	tcb_node *ret = (tcb_node*)(malloc(sizeof(tcb_node)));
+	ret->t = t;
+	ret->joined_on = NULL;
+	ret->joined_on_ret = NULL;
+	ret->next = NULL;
+	return ret;
+
+}
+
 tcb *peek(runqueue * rq){
 
 	return (rq->head)->t;
 
 }
 
-void enqueue(runqueue * rq, tcb * t){
+void enqueue(runqueue * rq, tcb_node * t){
 
 	if(rq->head==NULL){
 
-		rq->head = (tcb_node*)(malloc(sizeof(tcb_node)));
-		(rq->head)->t = t;
+		rq->head = t;
 		(rq->head)->next = NULL;
 		rq->tail = rq->head;
 		rq->size++;
@@ -276,15 +338,14 @@ void enqueue(runqueue * rq, tcb * t){
 
 	}
 
-	(rq->tail)->next = (tcb_node*)(malloc(sizeof(tcb_node)));
-	((rq->tail)->next)->t = t;
-	rq->tail = (rq->tail)->next;
+	(rq->tail)->next = t;
+	rq->tail = t;
 	(rq->tail)->next = rq->head;
 	rq->size++;
 
 }
 
-tcb *dequeue(runqueue * rq){
+tcb_node *dequeue(runqueue * rq){
 
 	if(rq->head==NULL){
 
@@ -292,11 +353,9 @@ tcb *dequeue(runqueue * rq){
 
 	}
 
-	tcb *tmp = (rq->head)->t;
-	tcb_node *tmp2 = rq->head;
+	tcb_node *tmp = rq->head;
 	rq->head = (rq->head)->next;
 	(rq->tail)->next = rq->head;
-	free(tmp2);
 	rq->size--;
 	return tmp;
 

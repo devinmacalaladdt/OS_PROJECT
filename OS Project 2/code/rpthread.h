@@ -32,7 +32,7 @@ enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3 }; //Initia
 typedef struct threadControlBlock {
 	/* add important states in a thread control block */
 	// thread Id
-	rpthread_t* TiD;
+	rpthread_t* TiD;	
 
 	// thread status
 	unsigned state;
@@ -64,12 +64,19 @@ typedef struct rpthread_mutex_t {
 
 tcb * initializeTCB(rpthread_t * thread);
 
+
+
 typedef struct tcb_nodes{
 
 	tcb *t;
 	struct tcb_nodes *next;
+	//joined on is a list of tcb_nodes containing pointers to tcbs that are joined on 't' NOTE: NOT SAME TCB_NODE LIST AS RUNQUEUE, THIS IS PER TCB_NODE
+	struct tcb_nodes *joined_on;
+	//if this tcb_node is part of another's joined_on list, joined_on_ret will have a void** to whatever was passed into rpthread_join()
+	void **joined_on_ret;
 
 }tcb_node;
+
 
 typedef struct runqueues{
 
@@ -81,9 +88,10 @@ typedef struct runqueues{
 
 void setup_runqueue(runqueue * rq);
 tcb *peek(runqueue * rq);
-void enqueue(runqueue * rq, tcb * t);
-tcb *dequeue(runqueue * rq);
+void enqueue(runqueue * rq, tcb_node * t);
+tcb_node *dequeue(runqueue * rq);
 void handler(int signum);
+tcb_node * setup_tcb_node(tcb * t);
 
 
 /* Function Declarations: */
