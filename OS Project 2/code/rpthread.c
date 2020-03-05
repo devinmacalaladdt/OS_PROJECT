@@ -13,6 +13,7 @@ ucontext_t sched_context;
 rpthread_t openTiD = 0;
 runqueue * rq_ptr = NULL;
 runqueue rq;
+struct itimerval timer;
 static void schedule();
 /* create a new thread
 * return 0 for success, 1 for error
@@ -26,6 +27,9 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	// Allocate space of stack for this thread to run
 	// after everything is all set, push this thread int
 	// YOUR CODE HERE
+	if(rq_ptr!=NULL){
+		timer.it_value.tv_usec = 0;
+	}
 	tcb * _tcb = initializeTCB(thread);
 	if (_tcb == NULL)
 		return -1;
@@ -52,7 +56,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		sa.sa_handler = &handler;
 		sigaction (SIGPROF, &sa, NULL);
 
-		struct itimerval timer;
+		
 
 		timer.it_interval.tv_usec = 5000;
 		timer.it_interval.tv_sec = 0;
@@ -82,6 +86,8 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	makecontext(&(_tcb->context),(void(*)())function,1,arg);
 	_tcb->state = READY;
 	enqueue(rq_ptr,setup_tcb_node(_tcb));
+	timer.it_value.tv_usec = 1;
+	setitimer(ITIMER_PROF, &timer, NULL);
 
 
     return 0;
@@ -94,6 +100,7 @@ int rpthread_yield() {
 	// Save context of this thread to its thread control block
 	// switch from thread context to scheduler context
 	//set currently running to ready then context switch to scheduler
+	timer.it_value.tv_usec = 0;
 	((rq_ptr->head)->t)->state=READY;
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
 	// YOUR CODE HERE
@@ -103,6 +110,7 @@ int rpthread_yield() {
 /* terminate a thread */
 void rpthread_exit(void *value_ptr) {
 	// Deallocated any dynamic memory created when starting this thread
+	timer.it_value.tv_usec = 0;
 
 	// YOUR CODE HERE
 };
@@ -115,7 +123,9 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	// De-allocate any dynamic memory created by the joining thread
 
 	//iterate through runqueue, look for desired thread
+	timer.it_value.tv_usec = 0;
 	tcb_node * curr = rq_ptr->head;
+
 	do{
 
 		if(*((curr->t)->TiD)==thread){
@@ -160,6 +170,14 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 		curr = curr->next;
 
 	}while(curr!=rq_ptr->head);
+
+	if(curr==rq_ptr->head){
+
+		timer.it_value.tv_usec = 1;
+		setitimer(ITIMER_PROF, &timer, NULL);
+		return -1;
+
+	}
 
 	//set status of current thread to blocked and context switch to scheduler
 	((rq_ptr->head)->t)->state = BLOCKED;
@@ -239,6 +257,8 @@ static void schedule() {
 	}
 	//set state to running and context switch in
 	((rq_ptr->head)->t)->state = RUNNING;
+	timer.it_value.tv_usec = 1;
+	setitimer(ITIMER_PROF, &timer, NULL);
 	setcontext(&((peek(rq_ptr))->context));
 
 
@@ -365,6 +385,7 @@ tcb_node *dequeue(runqueue * rq){
 void handler(int signum){
 
 	//save current thread and context switch to scheduler
+	timer.it_value.tv_usec = 0;
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
 
 }
