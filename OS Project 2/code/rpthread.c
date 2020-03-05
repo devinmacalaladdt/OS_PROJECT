@@ -111,7 +111,22 @@ int rpthread_yield() {
 void rpthread_exit(void *value_ptr) {
 	// Deallocated any dynamic memory created when starting this thread
 	timer.it_value.tv_usec = 0;
+	tcb * temp = ((rq_ptr->head)->t);
+	temp->state = DESTROYED;
 
+	//deschedule
+	dequeue(rq_ptr);
+
+	//free stack frame
+	free(temp->stackPtr);
+	//free tcb struct
+	free(temp);
+
+	//release mutexes?
+
+	//return value
+	if (value_ptr != NULL) //caller wants a return value
+		*value_ptr = /*return value*/;
 	// YOUR CODE HERE
 };
 

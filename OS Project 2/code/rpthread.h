@@ -26,7 +26,7 @@
 typedef uint rpthread_t;
 
 //Constants
-enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3 }; //Initialization = set up structs but doesn't have a function to run
+enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3, DESTROYED = 4 }; //Initialization = set up structs but doesn't have a function to run, Destroyed = deallocating and descheduling
 
 
 typedef struct threadControlBlock {
