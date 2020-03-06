@@ -115,18 +115,29 @@ void rpthread_exit(void *value_ptr) {
 	temp->state = DESTROYED;
 
 	//deschedule
-	dequeue(rq_ptr);
+	//dequeue(rq_ptr);
+	
+	//ready / unblock all waiting join threads if any
+	tcb_node *joinList = (rq_ptr->head)->joined_on;
+
+	while (joinList != NULL) {
+		joinList->t->state = READY;
+		if (value_ptr != NULL) //caller wants a return value
+			*(joinList->joined_on_ret) = value_ptr;
+		joinList = joinList->next;
+	}
+
 
 	//free stack frame
-	free(temp->stackPtr);
+	free((void*)temp->stackPtr);
 	//free tcb struct
-	free(temp);
+	free((void*)temp);
+	//Set to NULL for descheduling
+	((rq_ptr->head)->t) = NULL;
 
 	//release mutexes?
 
-	//return value
-	if (value_ptr != NULL) //caller wants a return value
-		*value_ptr = /*return value*/;
+	setcontext(&sched_context);
 	// YOUR CODE HERE
 };
 
