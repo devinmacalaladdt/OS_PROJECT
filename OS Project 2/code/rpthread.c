@@ -266,15 +266,40 @@ static void schedule() {
 	// 		sched_mlfq();
 
 	// YOUR CODE HERE
+	//if current running was destroyed, free its joined_on list
+	if((rq_ptr->head)->t==NULL){
 
-	//If the current thread is running, set it to ready to be queued
-	if(((rq_ptr->head)->t)->state==RUNNING){
+		tcb_node * curr = (rq_ptr->head)->joined_on;
+		while(curr!=NULL){
 
-		((rq_ptr->head)->t)->state = READY;
+			tcb_node * t = curr;
+			curr = curr->next;
+			free(t);
+
+		} 
 
 	}
-	//dequeue current thread + enqueue it
-	enqueue(rq_ptr,dequeue(rq_ptr));
+	
+
+	//dequeue current thread + enqueue it, unless its destroyed, then dequeue and free tcb_node 
+	if((rq_ptr->head)->t==NULL){
+
+		tcb_node * t = (rq_ptr->head);
+		dequeue((rq_ptr->head));
+		free(t);
+
+	}else{
+
+		//If the current thread is running, set it to ready to be queued
+		if(((rq_ptr->head)->t)->state==RUNNING){
+
+			((rq_ptr->head)->t)->state = READY;
+
+		}
+		enqueue(rq_ptr,dequeue(rq_ptr));
+
+	}
+
 	// keep enqueueing the dequeued thread until one is ready
 	while(peek(rq_ptr)->state!=READY){
 
