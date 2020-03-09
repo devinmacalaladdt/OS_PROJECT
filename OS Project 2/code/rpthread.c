@@ -15,11 +15,13 @@ runqueue * rq_ptr = NULL;
 runqueue rq;
 struct itimerval timer;
 static void schedule();
+
+//pause timer on enter of critical section
+int unInterMode = 0;
+
 /* create a new thread
 * return 0 for success, 1 for error
 */
-
-
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	void *(*function)(void*), void * arg) {
 	// Create Thread Control Block
@@ -213,10 +215,22 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	return 0;
 };
 
-/* initialize the mutex lock */
+/* initialize the mutex lock 
+0 success
+other for error
+*/
 int rpthread_mutex_init(rpthread_mutex_t *mutex, 
                           const pthread_mutexattr_t *mutexattr) {
 	//Initialize data structures for this mutex
+	mutex = (pthread_mutex_t*)malloc(sizeof(rpthread_mutex_t));
+	if (mutex == NULL)
+		return 1;
+	mutex->condition_variable = 0; // unlocked state
+	//mutex->ownerTID = ((rq_ptr->head)->t)->TiD;
+	if (mutexattr == NULL)
+		mutex->mutex_attr = 0; //some default value
+	mutex->blockingOnLock = NULL;
+	//specify other attributes as needed
 
 	// YOUR CODE HERE
 	return 0;
@@ -229,25 +243,80 @@ int rpthread_mutex_lock(rpthread_mutex_t *mutex) {
         // If acquiring mutex fails, push current thread into block list and 
         // context switch to the scheduler thread
 
+		//pause scheduler for non-interrupted testandset
+		unInterMode = 1;
+		while(TestAndSet(&(mutex->condition_variable))) { //while for spin-mode
+			unInterMode = 0;
+			//block until lock is available
+			//set status of current thread to blocked and context switch
+			((rq_ptr->head)->t)->state = BLOCKED;
+			//create blocked tcb
+			state_list *t = (void *)malloc(sizeof(state_list);
+			t.state = &(((rq_ptr->head)->t)->state);
+			t.next = NULL;
+
+			//add to list
+			if (mutex->blockingOnLock == NULL)
+				mutex->blockingOnLock = t;
+			else //add to back
+			{
+				state_list * counter = mutex->blockingOnLock;
+				while (counter->next != NULL)
+					counter = counter->next; //find end
+				counter->next = t;
+			}
+			rpthread_yield();
+		}
+		unInterMode = 0;
+		/*lock aquired*/
+		mutex->ownerTID = ((rq_ptr->head)->t)->TiD;
         // YOUR CODE HERE
+
+		//do critical section stuff
         return 0;
 };
 
-/* release the mutex lock */
+/* release the mutex lock 
+Success 0
+Error 1
+*/
 int rpthread_mutex_unlock(rpthread_mutex_t *mutex) {
 	// Release mutex and make it available again. 
 	// Put threads in block list to run queue 
 	// so that they could compete for mutex later.
 
+	if (mutex->ownerTID == ((rq_ptr->head)->t)->TiD){
+		mutex->condition_variable = 0;
+		if (mutex->blockingOnLock != NULL) { //ready first in queue
+			*((mutex->blockingOnLock)->state) = READY;
+			state_list * temp = (mutex->blockingOnLock)->next;
+			free((void*)mutex->blockingOnLock);
+			mutex->blockingOnLock = temp;
+		}
+		return 0;
+	}
+	return 1; //not owner of the lock
 	// YOUR CODE HERE
-	return 0;
+
 };
 
+//Implement user level test and set
+int TestAndSet(int * target) {
+	int oldTarget = *target;
+	if (*target == 0)
+		*target = 1;
+	return oldTarget;
+}
 
-/* destroy the mutex */
+
+/* destroy the mutex 
+0 success
+other for error*/
 int rpthread_mutex_destroy(rpthread_mutex_t *mutex) {
 	// Deallocate dynamic memory created in rpthread_mutex_init
-
+	if (mutex == NULL)
+		return 1;
+	free((void*)mutex);
 	return 0;
 };
 
@@ -434,6 +503,7 @@ tcb_node *dequeue(runqueue * rq){
 }
 
 void handler(int signum){
+	while (unInterMode);//prevent context switch if in atomic critical section mode
 
 	//save current thread and context switch to scheduler
 	timer.it_value.tv_usec = 0;
