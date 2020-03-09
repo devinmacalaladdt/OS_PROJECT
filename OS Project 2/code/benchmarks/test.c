@@ -12,30 +12,78 @@
  */
 void* foo(void * args){
 
-	while(1){
+	int x = *((int *)args);
+	int y = 0;
+	for(y=0;y<10000;y++){
 
-		printf("foo\n");
+		printf("foo->%d\n",y);
 
 	}
+
+	int * ret = malloc(sizeof(int));
+	*(ret) = x+y;
+	rpthread_exit((void *)ret);
 
 }
 void * bar(void * args){
 
-	while(1){
+	int x = *((int *)args);
+	int y = 0;
+	for(y=0;y<10000;y++){
 
-		printf("bar\n");
+		printf("bar->%d\n",y);
 
 	}
+
+	int * ret = malloc(sizeof(int));
+	*(ret) = x+y;
+	rpthread_exit((void *)ret);
+
+}
+void * yeet(void * args){
+
+	int x = *((int *)args);
+	int y = 0;
+	for(y=0;y<10000;y++){
+
+		printf("yeet->%d\n",y);
+
+	}
+
+	int * ret = malloc(sizeof(int));
+	*(ret) = x+y;
+	rpthread_exit((void *)ret);
 
 }
 int main(int argc, char **argv) {
 
 	rpthread_t thread_id; 
-	rpthread_t thread_id2; 
-    printf("Before Thread\n"); 
-    pthread_create(&thread_id, NULL, foo, NULL); 
-    pthread_create(&thread_id2, NULL, bar, NULL); 
+	rpthread_t thread_id2;
+	rpthread_t thread_id3;
+	void * p = malloc(sizeof(int));
+	*((int*)p) = 50;
+	void * p2 = malloc(sizeof(int));
+	*((int*)p2) = 70;
+	void * p3 = malloc(sizeof(int));
+	*((int*)p3) = 80;
+	rpthread_create(&thread_id2, NULL, bar, p2);
+    rpthread_create(&thread_id, NULL, foo, p);
+    rpthread_create(&thread_id3, NULL, yeet, p3);
+    void *y;
+    void *y2;
+    void *y3;
 
-    while(1){}
+    rpthread_join(thread_id2,&y2);
+    rpthread_join(thread_id,&y);
+    rpthread_join(thread_id3,&y3);
+
+    printf("%d\n",*((int *)y));
+    printf("%d\n",*((int *)y2));
+    printf("%d\n",*((int *)y3));
+
+    free(p);
+    free(p2);
+    free(p3);
+
 	return 0;
 }

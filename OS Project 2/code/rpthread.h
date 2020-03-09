@@ -72,8 +72,10 @@ typedef struct tcb_nodes{
 	struct tcb_nodes *next;
 	//joined on is a list of tcb_nodes containing pointers to tcbs that are joined on 't' NOTE: NOT SAME TCB_NODE LIST AS RUNQUEUE, THIS IS PER TCB_NODE
 	struct tcb_nodes *joined_on;
+	//return value to be saved in case the thread is joined on after it ends
+	void * ret_val;
 	//if this tcb_node is part of another's joined_on list, joined_on_ret will have a void** to whatever was passed into rpthread_join()
-	void **joined_on_ret;
+	void ** joined_on_ret;
 
 }tcb_node;
 
