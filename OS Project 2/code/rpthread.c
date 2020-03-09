@@ -112,30 +112,28 @@ int rpthread_yield() {
 /* terminate a thread */
 void rpthread_exit(void *value_ptr) {
 	// Deallocated any dynamic memory created when starting this thread
+	//pause timer
 	timer.it_value.tv_usec = 0;
-	tcb * temp = ((rq_ptr->head)->t);
-	temp->state = DESTROYED;
-
-	//deschedule
-	//dequeue(rq_ptr);
 	
 	//ready / unblock all waiting join threads if any
 	tcb_node *joinList = (rq_ptr->head)->joined_on;
 
 	while (joinList != NULL) {
-		joinList->t->state = READY;
+		(joinList->t)->state = READY;
 		if (value_ptr != NULL) //caller wants a return value
 			*(joinList->joined_on_ret) = value_ptr;
-		joinList = joinList->next;
+		tcb_node *x = joinList->next;
+		free(joinList); 
+		joinList = x;
 	}
 
 
 	//free stack frame
-	free((void*)temp->stackPtr);
-	//free tcb struct
-	free((void*)temp);
-	//Set to NULL for descheduling
-	((rq_ptr->head)->t) = NULL;
+	free(((rq_ptr->head)->t)->stackPtr);
+
+	//set ret val to value_ptr for future threads that join this one
+	((rq_ptr->head)->ret_val) = value_ptr;
+	((rq_ptr->head)->t)->state = DESTROYED;
 
 	//release mutexes?
 
@@ -152,14 +150,27 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 
 	//iterate through runqueue, look for desired thread
 	timer.it_value.tv_usec = 0;
-	tcb_node * curr = rq_ptr->head;
+	int set_blocked = 1;
+	int found = 0;
+	tcb_node * curr = (rq_ptr->head);
+
 
 	do{
 
 		if(*((curr->t)->TiD)==thread){
+			found = 1;
+			//thread found. If no current threads are joined on it, start the list. If its destroyed,
+			//set value_ptr and make sure this thread isnt set to BLOCKED
+			if((curr->t)->state==DESTROYED){
 
-			//thread found. If no current threads are joined on it, start the list
-			if(curr->joined_on==NULL){
+				if(value_ptr!=NULL){
+
+					*value_ptr = curr->ret_val;
+
+				}
+				set_blocked = 0;
+
+			}else if(curr->joined_on==NULL){
 
 				curr->joined_on = setup_tcb_node((rq_ptr->head)->t);
 				//set the joined_on_ret to value_ptr if its not null
@@ -198,8 +209,8 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 		curr = curr->next;
 
 	}while(curr!=rq_ptr->head);
-
-	if(curr==rq_ptr->head){
+	//error
+	if(found==0){
 
 		timer.it_value.tv_usec = 1;
 		setitimer(ITIMER_PROF, &timer, NULL);
@@ -208,7 +219,11 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	}
 
 	//set status of current thread to blocked and context switch to scheduler
-	((rq_ptr->head)->t)->state = BLOCKED;
+	if(set_blocked==1){
+
+		((rq_ptr->head)->t)->state = BLOCKED;
+
+	}
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
   
 	// YOUR CODE HERE
@@ -335,39 +350,15 @@ static void schedule() {
 	// 		sched_mlfq();
 
 	// YOUR CODE HERE
-	//if current running was destroyed, free its joined_on list
-	if((rq_ptr->head)->t==NULL){
 
-		tcb_node * curr = (rq_ptr->head)->joined_on;
-		while(curr!=NULL){
 
-			tcb_node * t = curr;
-			curr = curr->next;
-			free(t);
+	//If the current thread is running, set it to ready to be queued
+	if(((rq_ptr->head)->t)->state==RUNNING){
 
-		} 
+		((rq_ptr->head)->t)->state = READY;
 
 	}
-	
-
-	//dequeue current thread + enqueue it, unless its destroyed, then dequeue and free tcb_node 
-	if((rq_ptr->head)->t==NULL){
-
-		tcb_node * t = (rq_ptr->head);
-		dequeue((rq_ptr->head));
-		free(t);
-
-	}else{
-
-		//If the current thread is running, set it to ready to be queued
-		if(((rq_ptr->head)->t)->state==RUNNING){
-
-			((rq_ptr->head)->t)->state = READY;
-
-		}
-		enqueue(rq_ptr,dequeue(rq_ptr));
-
-	}
+	enqueue(rq_ptr,dequeue(rq_ptr));
 
 	// keep enqueueing the dequeued thread until one is ready
 	while(peek(rq_ptr)->state!=READY){
@@ -455,6 +446,7 @@ tcb_node * setup_tcb_node(tcb * t){
 	ret->t = t;
 	ret->joined_on = NULL;
 	ret->joined_on_ret = NULL;
+	ret->ret_val = NULL;
 	ret->next = NULL;
 	return ret;
 
