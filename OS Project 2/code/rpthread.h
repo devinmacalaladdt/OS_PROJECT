@@ -32,7 +32,7 @@ enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3, DESTROYED 
 typedef struct threadControlBlock {
 	/* add important states in a thread control block */
 	// thread Id
-	rpthread_t* TiD;	
+	rpthread_t* TiD;
 
 	// thread status
 	unsigned state;
@@ -88,7 +88,6 @@ typedef struct tcb_nodes{
 
 }tcb_node;
 
-
 typedef struct runqueues{
 
 	tcb_node *head;
@@ -99,10 +98,9 @@ typedef struct runqueues{
 
 void setup_runqueue(runqueue * rq);
 tcb *peek(runqueue * rq);
-void enqueue(runqueue * rq, tcb_node * t);
-tcb_node *dequeue(runqueue * rq);
+void enqueue(runqueue * rq, tcb * t);
+tcb *dequeue(runqueue * rq);
 void handler(int signum);
-tcb_node * setup_tcb_node(tcb * t);
 
 
 /* Function Declarations: */

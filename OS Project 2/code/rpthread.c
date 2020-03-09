@@ -138,9 +138,25 @@ void rpthread_exit(void *value_ptr) {
 	//release mutexes?
 
 	setcontext(&sched_context);
+
+	tcb * temp = ((rq_ptr->head)->t);
+	temp->state = DESTROYED;
+
+	//deschedule
+	dequeue(rq_ptr);
+
+	//free stack frame
+	free((void*)temp->stackPtr);
+	//free tcb struct
+	free((void*)temp);
+
+	//release mutexes?
+
+	//return value
+	if (value_ptr != NULL) //caller wants a return value
+		*value_ptr = /*return value*/;
 	// YOUR CODE HERE
 };
-
 
 /* Wait for thread termination */
 int rpthread_join(rpthread_t thread, void **value_ptr) {
