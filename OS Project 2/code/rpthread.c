@@ -18,6 +18,7 @@ static void schedule();
 
 //pause timer on enter of critical section
 int unInterMode = 0;
+static int TestAndSet(volatile int *);
 
 /* create a new thread
 * return 0 for success, 1 for error
@@ -152,9 +153,6 @@ void rpthread_exit(void *value_ptr) {
 
 	//release mutexes?
 
-	//return value
-	if (value_ptr != NULL) //caller wants a return value
-		*value_ptr = /*return value*/;
 	// YOUR CODE HERE
 };
 
@@ -282,13 +280,14 @@ int rpthread_mutex_lock(rpthread_mutex_t *mutex) {
 			//set status of current thread to blocked and context switch
 			((rq_ptr->head)->t)->state = BLOCKED;
 			//create blocked tcb
-			state_list *t = (void *)malloc(sizeof(state_list);
-			t.state = &(((rq_ptr->head)->t)->state);
-			t.next = NULL;
+			state_list *t = (void *)malloc(sizeof(state_list));
+			t->state = &(((rq_ptr->head)->t)->state);
+			t->next = NULL;
 
 			//add to list
-			if (mutex->blockingOnLock == NULL)
+			if (mutex->blockingOnLock == NULL) {
 				mutex->blockingOnLock = t;
+			}
 			else //add to back
 			{
 				state_list * counter = mutex->blockingOnLock;
@@ -332,7 +331,7 @@ int rpthread_mutex_unlock(rpthread_mutex_t *mutex) {
 };
 
 //Implement user level test and set
-int TestAndSet(int * target) {
+static int TestAndSet(volatile int * target) {
 	int oldTarget = *target;
 	if (*target == 0)
 		*target = 1;

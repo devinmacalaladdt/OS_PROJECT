@@ -52,11 +52,16 @@ typedef struct threadControlBlock {
 } tcb;
 
 
+typedef struct state_list {
+	unsigned * state;
+	struct state_list * next;
+}state_list;
+
 /* mutex struct definition */
 typedef struct rpthread_mutex_t {
 	/* add something here */
 	volatile int condition_variable; //Set to 0 : unlock or 1 : lock
-	unsigned ownerTID;
+	rpthread_t * ownerTID;
 	int mutex_attr;
 
 	//points to the state int in a blocking TCB to flip to READY later on; list
@@ -68,11 +73,6 @@ typedef struct rpthread_mutex_t {
 // Feel free to add your own auxiliary data structures (linked list or queue etc...)
 
 tcb * initializeTCB(rpthread_t * thread);
-
-typedef struct state_list {
-	unsigned * state;
-	state_list * next;
-}state_list;
 
 
 typedef struct tcb_nodes{
