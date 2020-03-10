@@ -46,6 +46,9 @@ typedef struct threadControlBlock {
 	// thread priority
 	unsigned priority; //Realtime 0 - 99?
 
+	//quantum used for SJF
+	unsigned long quantum;
+
 	// And more ...
 
 	// YOUR CODE HERE
@@ -96,10 +99,18 @@ typedef struct runqueues{
 
 }runqueue;
 
+//generic queue functions
 void setup_runqueue(runqueue * rq);
 tcb *peek(runqueue * rq);
+<<<<<<< Updated upstream
 void enqueue(runqueue * rq, tcb * t);
 tcb *dequeue(runqueue * rq);
+=======
+void enqueue(runqueue * rq, tcb_node * t);
+//used for SJF to insert at front
+void enqueue_start(runqueue * rq, tcb_node * t);
+tcb_node *dequeue(runqueue * rq);
+>>>>>>> Stashed changes
 void handler(int signum);
 
 

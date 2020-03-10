@@ -8,18 +8,29 @@
 
 // INITAILIZE ALL YOUR VARIABLES HERE
 // YOUR CODE HERE
-//Highest available TiD (assumes no re-use)
+
+//global schedule context
 ucontext_t sched_context;
+//Highest available TiD (assumes no re-use)
 rpthread_t openTiD = 0;
+//run queue
 runqueue * rq_ptr = NULL;
 runqueue rq;
+//timer
 struct itimerval timer;
+//SJF = 0, MLFQ = 1
+int mode=0;
 static void schedule();
+<<<<<<< Updated upstream
 
 //pause timer on enter of critical section
 int unInterMode = 0;
 static int TestAndSet(volatile int *);
 
+=======
+static void sched_stcf();
+static void sched_mlfq();
+>>>>>>> Stashed changes
 /* create a new thread
 * return 0 for success, 1 for error
 */
@@ -30,14 +41,23 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	// Allocate space of stack for this thread to run
 	// after everything is all set, push this thread int
 	// YOUR CODE HERE
+
 	if(rq_ptr!=NULL){
+		//pause timer
 		timer.it_value.tv_usec = 0;
 	}
 	tcb * _tcb = initializeTCB(thread);
 	if (_tcb == NULL)
 		return -1;
 	if(rq_ptr==NULL){
-		//first thread, set up queue + timer
+
+		//setting schedule type
+		#ifndef MLFQ
+			mode = 0;
+		#else 
+			mode = 1;
+		#endif
+		//first thread, set up queue
 		rq_ptr = (runqueue*)(malloc(sizeof(runqueue)));
 		setup_runqueue(rq_ptr);
 		rq = *rq_ptr;
@@ -54,12 +74,11 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		sched_context.uc_stack.ss_flags = 0;
 		makecontext(&sched_context,(void *)&schedule,0);
 
+		//timer setup
 		struct sigaction sa;
 		memset (&sa, 0, sizeof (sa));
 		sa.sa_handler = &handler;
 		sigaction (SIGPROF, &sa, NULL);
-
-		
 
 		timer.it_interval.tv_usec = 5000;
 		timer.it_interval.tv_sec = 0;
@@ -73,7 +92,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		*(calling->TiD) = openTiD++;
 		//calling context already running
 		calling->state = RUNNING;
-
+		calling->quantum = 0;
 		enqueue(rq_ptr,setup_tcb_node(calling));
 
 		//specified context created + queued
@@ -81,7 +100,9 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		_tcb->state = READY;
 		enqueue(rq_ptr,setup_tcb_node(_tcb));
 
+		//start timer
 		setitimer(ITIMER_PROF, &timer, NULL);
+
 		return 0;
 	}
 
@@ -92,7 +113,6 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	timer.it_value.tv_usec = 1;
 	setitimer(ITIMER_PROF, &timer, NULL);
 
-
     return 0;
 };
 
@@ -101,12 +121,13 @@ int rpthread_yield() {
 	
 	// Change thread state from Running to Ready
 	// Save context of this thread to its thread control block
-	// switch from thread context to scheduler context
-	//set currently running to ready then context switch to scheduler
+
+	//pause timer
 	timer.it_value.tv_usec = 0;
+	//set currently running to ready then context switch to scheduler
 	((rq_ptr->head)->t)->state=READY;
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
-	// YOUR CODE HERE
+
 	return 0;
 };
 
@@ -118,7 +139,6 @@ void rpthread_exit(void *value_ptr) {
 	
 	//ready / unblock all waiting join threads if any
 	tcb_node *joinList = (rq_ptr->head)->joined_on;
-
 	while (joinList != NULL) {
 		(joinList->t)->state = READY;
 		if (value_ptr != NULL) //caller wants a return value
@@ -138,6 +158,7 @@ void rpthread_exit(void *value_ptr) {
 
 	//release mutexes?
 
+	//context switch to scheduler
 	setcontext(&sched_context);
 
 	tcb * temp = ((rq_ptr->head)->t);
@@ -162,19 +183,29 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	// Wait for a specific thread to terminate
 	// De-allocate any dynamic memory created by the joining thread
 
-	//iterate through runqueue, look for desired thread
+	//pause timer
 	timer.it_value.tv_usec = 0;
+	if(rq_ptr==NULL){
+
+		timer.it_value.tv_usec = 1;
+		setitimer(ITIMER_PROF, &timer, NULL);
+		return -1;
+
+	}
+
 	int set_blocked = 1;
 	int found = 0;
 	tcb_node * curr = (rq_ptr->head);
 
-
+	//iterate through runqueue, look for desired thread
 	do{
 
 		if(*((curr->t)->TiD)==thread){
-			found = 1;
+
 			//thread found. If no current threads are joined on it, start the list. If its destroyed,
-			//set value_ptr and make sure this thread isnt set to BLOCKED
+			//set value_ptr and make sure this thread isnt set to BLOCKED. If other threads already
+			//joined, append to list
+			found = 1;
 			if((curr->t)->state==DESTROYED){
 
 				if(value_ptr!=NULL){
@@ -187,6 +218,7 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 			}else if(curr->joined_on==NULL){
 
 				curr->joined_on = setup_tcb_node((rq_ptr->head)->t);
+
 				//set the joined_on_ret to value_ptr if its not null
 				if(value_ptr!=NULL){
 				
@@ -223,6 +255,7 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 		curr = curr->next;
 
 	}while(curr!=rq_ptr->head);
+
 	//error
 	if(found==0){
 
@@ -238,6 +271,8 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 		((rq_ptr->head)->t)->state = BLOCKED;
 
 	}
+
+	//swap to scheduler
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
   
 	// YOUR CODE HERE
@@ -356,46 +391,15 @@ static void schedule() {
 	// should be contexted switched from thread context to this 
 	// schedule function
 
-	// Invoke different actual scheduling algorithms
-	// according to policy (STCF or MLFQ)
+	if(mode==0){
 
-	// if (sched == STCF)
-	//		sched_stcf();
-	// else if (sched == MLFQ)
-	// 		sched_mlfq();
+		sched_stcf();
 
-	// YOUR CODE HERE
+	}else{
 
-
-	//If the current thread is running, set it to ready to be queued
-	if(((rq_ptr->head)->t)->state==RUNNING){
-
-		((rq_ptr->head)->t)->state = READY;
+		sched_mlfq();
 
 	}
-	enqueue(rq_ptr,dequeue(rq_ptr));
-
-	// keep enqueueing the dequeued thread until one is ready
-	while(peek(rq_ptr)->state!=READY){
-
-		enqueue(rq_ptr,dequeue(rq_ptr));
-
-	}
-	//set state to running and context switch in
-	((rq_ptr->head)->t)->state = RUNNING;
-	timer.it_value.tv_usec = 1;
-	setitimer(ITIMER_PROF, &timer, NULL);
-	setcontext(&((peek(rq_ptr))->context));
-
-
-
-
-// schedule policy
-#ifndef MLFQ
-	// Choose STCF
-#else 
-	// Choose MLFQ
-#endif
 
 }
 
@@ -403,6 +407,111 @@ static void schedule() {
 static void sched_stcf() {
 	// Your own implementation of STCF
 	// (feel free to modify arguments and return types)
+	// If the current thread is running, set it to ready to be queued
+
+	//find READY job with least quantum and set it to swap, along with what comes before to prev_swap
+	tcb_node * swap = NULL;
+	tcb_node * prev_swap = NULL;
+	unsigned long min = ((rq_ptr->head)->t)->quantum;
+	tcb_node * curr = (rq_ptr->head)->next;
+	tcb_node * prev = rq_ptr->head;
+
+	while(curr!=rq_ptr->head){
+
+		if((curr->t)->state==READY && (curr->t)->quantum<=min){
+
+			swap = curr;
+			prev_swap = prev;
+			min = (curr->t)->quantum;
+
+		}
+
+		prev = curr;
+		curr = curr->next;
+
+	}
+
+	//could not find job with less than or equal quantum to whats currently running, so reschedule current job
+	if(swap==NULL && ((rq_ptr->head)->t)->state==RUNNING){
+
+		timer.it_value.tv_usec = 1;
+		setitimer(ITIMER_PROF, &timer, NULL);
+		setcontext(&((peek(rq_ptr))->context));
+
+	}
+
+	//could not find job with less than or equal quantum to whats currently in front of queue,
+	//but whats in front has either yeilded, joined, or exited, so enqueue it and schedule next runnable job 
+	if(swap==NULL && ((rq_ptr->head)->t)->state!=RUNNING){
+
+		enqueue(rq_ptr,dequeue(rq_ptr));
+
+		// keep enqueueing the dequeued thread until one is ready
+		while(peek(rq_ptr)->state!=READY){
+
+			enqueue(rq_ptr,dequeue(rq_ptr));
+
+		}
+		((rq_ptr->head)->t)->state = RUNNING;
+		timer.it_value.tv_usec = 1;
+		setitimer(ITIMER_PROF, &timer, NULL);
+		setcontext(&((peek(rq_ptr))->context));
+
+	}
+
+	//current front of queue job has either yeilded, joined, or exited, so enqueue it and swap in
+	//the job with lowest quantum
+	if(swap!=NULL && ((rq_ptr->head)->t)->state!=RUNNING){
+
+		if(swap==(rq_ptr->head)->next){
+
+			enqueue(rq_ptr,dequeue(rq_ptr));
+			((rq_ptr->head)->t)->state = RUNNING;
+			timer.it_value.tv_usec = 1;
+			setitimer(ITIMER_PROF, &timer, NULL);
+			setcontext(&((peek(rq_ptr))->context));
+
+		}
+
+		enqueue(rq_ptr,dequeue(rq_ptr));
+		prev_swap->next = swap->next;
+		enqueue_start(rq_ptr,swap);
+		((rq_ptr->head)->t)->state = RUNNING;
+		timer.it_value.tv_usec = 1;
+		setitimer(ITIMER_PROF, &timer, NULL);
+		setcontext(&((peek(rq_ptr))->context));
+
+
+	}
+
+	//current front of queue job has used its alloted runtime, so set it to READY, enqueue it and swap in
+	//the job with lowest quantum
+	if(swap!=NULL && ((rq_ptr->head)->t)->state==RUNNING){
+
+
+		if(swap==(rq_ptr->head)->next){
+
+			((rq_ptr->head)->t)->state=READY;
+			enqueue(rq_ptr,dequeue(rq_ptr));
+			((rq_ptr->head)->t)->state = RUNNING;
+			timer.it_value.tv_usec = 1;
+			setitimer(ITIMER_PROF, &timer, NULL);
+			setcontext(&((peek(rq_ptr))->context));
+			
+		}
+
+
+		((rq_ptr->head)->t)->state=READY;
+		enqueue(rq_ptr,dequeue(rq_ptr));
+		prev_swap->next = swap->next;
+		enqueue_start(rq_ptr,swap);
+		((rq_ptr->head)->t)->state = RUNNING;
+		timer.it_value.tv_usec = 1;
+		setitimer(ITIMER_PROF, &timer, NULL);
+		setcontext(&((peek(rq_ptr))->context));
+
+	}
+
 
 	// YOUR CODE HERE
 }
@@ -444,6 +553,7 @@ tcb * initializeTCB(rpthread_t * thread) {
 	context.uc_stack.ss_flags = 0;
 	_tcb->context = context;
 	_tcb->state = INITIALIZATION;
+	_tcb->quantum = 0;
 	return _tcb;
 }
 
@@ -491,6 +601,25 @@ void enqueue(runqueue * rq, tcb_node * t){
 	rq->size++;
 
 }
+void enqueue_start(runqueue * rq, tcb_node * t){
+
+	if(rq->head==NULL){
+
+		rq->head = t;
+		(rq->head)->next = NULL;
+		rq->tail = rq->head;
+		rq->size++;
+		return;
+
+	}
+
+	(rq_ptr->tail)->next = t;
+	t->next = rq_ptr->head;
+	rq_ptr->head = t;
+	rq->size++;
+
+}
+
 
 tcb_node *dequeue(runqueue * rq){
 
@@ -512,8 +641,12 @@ tcb_node *dequeue(runqueue * rq){
 void handler(int signum){
 	while (unInterMode);//prevent context switch if in atomic critical section mode
 
-	//save current thread and context switch to scheduler
 	timer.it_value.tv_usec = 0;
+
+	//increment quantum if current job has allowed timer to go off
+	((rq_ptr->head)->t)->quantum = ((rq_ptr->head)->t)->quantum + 1;
+
+	//save current thread and context switch to scheduler
 	swapcontext(&(((rq_ptr->head)->t)->context),&sched_context);
 
 }
