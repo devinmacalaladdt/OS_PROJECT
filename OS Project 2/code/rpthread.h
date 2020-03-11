@@ -102,16 +102,12 @@ typedef struct runqueues{
 //generic queue functions
 void setup_runqueue(runqueue * rq);
 tcb *peek(runqueue * rq);
-<<<<<<< Updated upstream
-void enqueue(runqueue * rq, tcb * t);
-tcb *dequeue(runqueue * rq);
-=======
 void enqueue(runqueue * rq, tcb_node * t);
 //used for SJF to insert at front
 void enqueue_start(runqueue * rq, tcb_node * t);
 tcb_node *dequeue(runqueue * rq);
->>>>>>> Stashed changes
 void handler(int signum);
+tcb_node * setup_tcb_node(tcb * t);
 
 
 /* Function Declarations: */

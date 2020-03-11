@@ -21,16 +21,12 @@ struct itimerval timer;
 //SJF = 0, MLFQ = 1
 int mode=0;
 static void schedule();
-<<<<<<< Updated upstream
-
 //pause timer on enter of critical section
 int unInterMode = 0;
 static int TestAndSet(volatile int *);
-
-=======
 static void sched_stcf();
 static void sched_mlfq();
->>>>>>> Stashed changes
+
 /* create a new thread
 * return 0 for success, 1 for error
 */
