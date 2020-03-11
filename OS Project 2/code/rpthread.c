@@ -281,14 +281,14 @@ other for error
 int rpthread_mutex_init(rpthread_mutex_t *mutex, 
                           const pthread_mutexattr_t *mutexattr) {
 	//Initialize data structures for this mutex
-	mutex = (pthread_mutex_t*)malloc(sizeof(rpthread_mutex_t));
+	//mutex = (rpthread_mutex_t*)malloc(sizeof(rpthread_mutex_t));
 	if (mutex == NULL)
 		return 1;
-	mutex->condition_variable = 0; // unlocked state
+	(mutex)->condition_variable = 0; // unlocked state
 	//mutex->ownerTID = ((rq_ptr->head)->t)->TiD;
 	if (mutexattr == NULL)
-		mutex->mutex_attr = 0; //some default value
-	mutex->blockingOnLock = NULL;
+		(mutex)->mutex_attr = 0; //some default value
+	(mutex)->blockingOnLock = NULL;
 	//specify other attributes as needed
 
 	// YOUR CODE HERE
@@ -325,7 +325,8 @@ int rpthread_mutex_lock(rpthread_mutex_t *mutex) {
 					counter = counter->next; //find end
 				counter->next = t;
 			}
-			rpthread_yield();
+			timer.it_value.tv_usec = 0;
+			swapcontext(&(((rq_ptr->head)->t)->context), &sched_context);
 		}
 		unInterMode = 0;
 		/*lock aquired*/
@@ -376,7 +377,18 @@ int rpthread_mutex_destroy(rpthread_mutex_t *mutex) {
 	// Deallocate dynamic memory created in rpthread_mutex_init
 	if (mutex == NULL)
 		return 1;
-	free((void*)mutex);
+	rpthread_mutex_unlock(mutex);
+	mutex->ownerTID = 0;
+	if (mutex->blockingOnLock != NULL)
+	{
+		state_list *temp;
+		do {
+			*((mutex->blockingOnLock)->state) = READY;
+			temp = (mutex->blockingOnLock)->next;
+			free((void*)mutex->blockingOnLock);
+		} while (temp != NULL);
+	}
+	//free((void*)mutex);
 	return 0;
 };
 
@@ -528,7 +540,7 @@ static void sched_mlfq() {
 * Null for error
 */
 tcb * initializeTCB(rpthread_t * thread) {
-	tcb * _tcb = malloc(sizeof(tcb));
+	tcb * _tcb = (tcb*)malloc(sizeof(tcb));
 	if (_tcb == NULL)
 		return NULL;
 	*thread = openTiD++;
