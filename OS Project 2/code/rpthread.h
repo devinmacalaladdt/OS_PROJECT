@@ -32,7 +32,7 @@ enum State { RUNNING = 0, READY = 1, BLOCKED = 2, INITIALIZATION = 3, DESTROYED 
 typedef struct threadControlBlock {
 	/* add important states in a thread control block */
 	// thread Id
-	rpthread_t* TiD;
+	rpthread_t TiD;
 
 	// thread status
 	unsigned state;
@@ -64,7 +64,7 @@ typedef struct state_list {
 typedef struct rpthread_mutex_t {
 	/* add something here */
 	volatile int condition_variable; //Set to 0 : unlock or 1 : lock
-	rpthread_t * ownerTID;
+	rpthread_t ownerTID;
 	int mutex_attr;
 
 	//points to the state int in a blocking TCB to flip to READY later on; list

@@ -84,8 +84,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 
 		//context of calling function created + queued
 		tcb * calling = malloc(sizeof(tcb));
-		calling->TiD = (rpthread_t*)malloc(sizeof(rpthread_t));
-		*(calling->TiD) = openTiD++;
+		calling->TiD = openTiD++;
 		//calling context already running
 		calling->state = RUNNING;
 		calling->quantum = 0;
@@ -196,7 +195,7 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	//iterate through runqueue, look for desired thread
 	do{
 
-		if(*((curr->t)->TiD)==thread){
+		if(((curr->t)->TiD)==thread){
 
 			//thread found. If no current threads are joined on it, start the list. If its destroyed,
 			//set value_ptr and make sure this thread isnt set to BLOCKED. If other threads already
@@ -533,8 +532,7 @@ tcb * initializeTCB(rpthread_t * thread) {
 	if (_tcb == NULL)
 		return NULL;
 	*thread = openTiD++;
-	_tcb->TiD = (rpthread_t*)malloc(sizeof(rpthread_t));
-	*(_tcb->TiD) = *thread;
+	_tcb->TiD = *thread;
 	_tcb->priority = INITIALIZATION;
 	void* stackPtr = (void *)malloc(SIGSTKSZ);
 	if (stackPtr == NULL)
