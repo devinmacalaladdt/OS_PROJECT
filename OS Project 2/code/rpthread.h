@@ -49,6 +49,9 @@ typedef struct threadControlBlock {
 	//quantum used for SJF
 	unsigned long quantum;
 
+	//quantums since this thread was last scheduled
+	unsigned long quantums_since_last_schedule;
+
 	// And more ...
 
 	// YOUR CODE HERE

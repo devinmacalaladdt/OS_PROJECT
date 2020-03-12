@@ -52,6 +52,8 @@ void external_calculate(void* arg) {
 		}
 		fclose(f);
 	}
+
+	pthread_exit(NULL);
 }
 
 
