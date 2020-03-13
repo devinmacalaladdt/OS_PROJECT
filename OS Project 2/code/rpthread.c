@@ -1,8 +1,10 @@
 // File:	rpthread.c
 
 // List all group member's name:
-// username of iLab:
-// iLab Server:
+// David Gasperini (dlg195)
+//Devin Macalalad (dtm97)
+// username of iLab: cd
+// iLab Server: cd.cs.rutgers.edu
 
 #include "rpthread.h"
 
@@ -769,7 +771,7 @@ tcb_node *dequeue(runqueue * rq){
 }
 
 void handler(int signum){
-	while (unInterMode);//prevent context switch if in atomic critical section mode
+	if (unInterMode) { return; }//prevent context switch if in atomic critical section mode
 
 	timer.it_value.tv_usec = 0;
 

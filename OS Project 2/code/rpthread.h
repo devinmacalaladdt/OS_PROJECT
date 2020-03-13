@@ -1,8 +1,10 @@
 // File:	rpthread_t.h
 
 // List all group member's name:
-// username of iLab:
-// iLab Server:
+// David Gasperini (dlg195)
+//Devin Macalalad (dtm97)
+// username of iLab: cd
+// iLab Server: cd.cs.rutgers.edu
 
 #ifndef RTHREAD_T_H
 #define RTHREAD_T_H
