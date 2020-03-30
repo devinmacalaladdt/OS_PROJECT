@@ -1,5 +1,96 @@
 #include "my_vm.h"
 
+char physical_map[(int)((MEMSIZE/PGSIZE)/8)];//bit map for physical pages
+char virtual_map[(int)((MAX_MEMSIZE/PGSIZE)/8)];//bit map for virtual pages
+char *physical_mem;//byte array of physical memory
+pde * page_directory;//page directory (array of page directory entries)
+
+
+// Example 1 EXTRACTING TOP-BITS (Outer bits)
+
+static unsigned int get_top_bits(unsigned int value)
+{
+    //Assume you would require just the higher order (outer)  bits, 
+    //that is first few bits from a number (e.g., virtual address) 
+    //So given an  unsigned int value, to extract just the higher order (outer)  “num_bits”
+    int num_bits_to_prune = 32 - PDBITS; //32 assuming we are using 32-bit address 
+    return (value >> num_bits_to_prune);
+}
+
+
+//Example 2 EXTRACTING BITS FROM THE MIDDLE
+//Now to extract some bits from the middle from a 32 bit number, 
+//assuming you know the number of lower_bits (for example, offset bits in a virtual address)
+
+static unsigned int get_mid_bits (unsigned int value)
+{
+
+   //value corresponding to middle order bits we will returning.
+   unsigned int mid_bits_value = 0;   
+
+   // First you need to remove the lower order bits (e.g. PAGE offset bits). 
+   value =    value >> PGBITS; 
+
+
+   // Next, you need to build a mask to prune the outer bits. How do we build a mask?   
+
+   // Step1: First, take a power of 2 for “num_middle_bits”  or simply,  a left shift of number 1.  
+   // You could try this in your calculator too.
+   unsigned int outer_bits_mask =   (1 << PTBITS);  
+
+   // Step 2: Now subtract 1, which would set a total of  “num_middle_bits”  to 1 
+   outer_bits_mask = outer_bits_mask-1;
+
+   // Now time to get rid of the outer bits too. Because we have already set all the bits corresponding 
+   // to middle order bits to 1, simply perform an AND operation. 
+   mid_bits_value =  value &  outer_bits_mask;
+
+  return mid_bits_value;
+
+}
+
+//Example 3
+//Function to set a bit at "index"
+// bitmap is a region where were store bitmap 
+static void set_bit_at_index(char *bitmap, int index, bool on)
+{
+    // We first find the location in the bitmap array where we want to set a bit
+    // Because each character can store 8 bits, using the "index", we find which 
+    // location in the character array should we set the bit to.
+    char *region = ((char *) bitmap) + (index / 8);
+
+    // Now, we cannot just write one bit, but we can only write one character. 
+    // So, when we set the bit, we should not distrub other bits. 
+    // So, we create a mask and OR with existing values
+    char bit = 1 << (index % 8);
+
+    // just set the bit to 1. NOTE: If we want to free a bit (*bitmap_region &= ~bit;)
+    if(on){
+
+        *region |= bit;
+
+    }else{
+
+        *region &= ~bit;
+
+    }
+
+    return;
+}
+
+
+//Example 3
+//Function to get a bit at "index"
+static int get_bit_at_index(char *bitmap, int index)
+{
+    //Same as example 3, get to the location in the character bitmap array
+    char *region = ((char *) bitmap) + (index / 8);
+
+    //Create a value mask that we are going to check if bit is set or not
+    char bit = 1 << (index % 8);
+
+    return (int)(*region >> (index % 8)) & 0x1;
+}
 /*
 Function responsible for allocating and setting your physical memory 
 */

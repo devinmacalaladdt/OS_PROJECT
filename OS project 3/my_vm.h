@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 //Assume the address space is 32 bits, so the max memory size is 4GB
 //Page size is 4KB
@@ -17,11 +18,28 @@
 // Size of "physcial memory"
 #define MEMSIZE 1024*1024*1024
 
+//ignore these two
 // Represents a page table entry
 typedef unsigned long pte_t;
 
 // Represents a page directory entry
 typedef unsigned long pde_t;
+
+typedef struct page_table_entry{
+
+    unsigned long ppn;//physical page number
+
+}pte;
+
+#define PGBITS (int)log2(PGSIZE)
+#define PTBITS PGBITS-(int)log2(sizeof(pte))
+#define PDBITS 32-PGBITS-PTBITS
+typedef struct page_directory_entry{
+
+    pte*pagetable;//pointer to page table (array of page table entries)
+
+}pde;
+
 
 #define TLB_ENTRIES 512
 
