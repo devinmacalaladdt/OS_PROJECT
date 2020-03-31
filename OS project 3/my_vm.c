@@ -1,9 +1,10 @@
 #include "my_vm.h"
 
-char physical_map[(int)((MEMSIZE/PGSIZE)/8)];//bit map for physical pages
-char virtual_map[(int)((MAX_MEMSIZE/PGSIZE)/8)];//bit map for virtual pages
+char *physical_map;//bit map for physical pages
+char *virtual_map;//bit map for virtual pages
 char *physical_mem;//byte array of physical memory
 pde * page_directory;//page directory (array of page directory entries)
+bool initialized = false;//global boolean, set to true after first a_malloc call
 
 
 // Example 1 EXTRACTING TOP-BITS (Outer bits)
@@ -91,6 +92,27 @@ static int get_bit_at_index(char *bitmap, int index)
 
     return (int)(*region >> (index % 8)) & 0x1;
 }
+
+void init(){
+
+    unsigned int num_of_pde = (unsigned int)(pow(2,PDBITS));
+    unsigned int num_of_pte = (unsigned int)(pow(2,PTBITS));
+
+    page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
+    int c = 0;
+    for(c=0;c<num_of_pde;c++){
+
+        (page_directory[c]).pagetable = (pte*)(malloc(sizeof(pte)*num_of_pte));
+        int i = 0;
+        for(i=0;i<num_of_pte;i++){
+
+            (((page_directory[c]).pagetable)[i]).ppn = 0;
+
+        }
+
+    }
+
+}
 /*
 Function responsible for allocating and setting your physical memory 
 */
@@ -98,8 +120,14 @@ void set_physical_mem() {
 
     //Allocate physical memory using mmap or malloc; this is the total size of
     //your memory you are simulating
+    physical_mem = (char*)(malloc(sizeof(char)*MEMSIZE));
+    physical_map = (char*)(malloc(sizeof(char)*((MEMSIZE/PGSIZE)/8)));
+    virtual_map = (char*)(malloc(sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8)));
 
+    memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));
+    memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
     
+    init();
     //HINT: Also calculate the number of physical and virtual pages and allocate
     //virtual and physical bitmaps and initialize them
 
