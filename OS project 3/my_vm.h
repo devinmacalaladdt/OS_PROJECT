@@ -28,7 +28,7 @@ typedef unsigned long pde_t;
 
 typedef struct page_table_entry{
 
-    unsigned long ppn;//physical page number
+    void * paddr;//physical address
 
 }pte;
 

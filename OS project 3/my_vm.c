@@ -106,7 +106,7 @@ void init(){
         int i = 0;
         for(i=0;i<num_of_pte;i++){
 
-            (((page_directory[c]).pagetable)[i]).ppn = 0;
+            (((page_directory[c]).pagetable)[i]).paddr = 0;
 
         }
 
@@ -124,10 +124,10 @@ void set_physical_mem() {
     physical_map = (char*)(malloc(sizeof(char)*((MEMSIZE/PGSIZE)/8)));
     virtual_map = (char*)(malloc(sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8)));
 
-    memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));
+    memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
     memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
     
-    init();
+    init();//initialize page directory and page tables
     //HINT: Also calculate the number of physical and virtual pages and allocate
     //virtual and physical bitmaps and initialize them
 
@@ -209,11 +209,30 @@ int
 page_map(pde_t *pgdir, void *va, void *pa)
 {
 
-    /*HINT: Similar to translate(), find the page directory (1st level)
-    and page table (2nd-level) indices. If no mapping exists, set the
-    virtual to physical mapping */
+    unsigned int pd = get_top_bits((unsigned int)va);
+    unsigned int pt = get_mid_bits((unsigned int)va);
 
-    return -1;
+    unsigned int pos = 0;
+    pos+=(pd*((unsigned int)(pow(2,PTBITS))));
+    pos+=pt;
+
+    if(pos>=((unsigned int)(pow(2,PTBITS)+pow(2,PDBITS)))){
+
+        return -1;
+
+    }
+
+    if(get_bit_at_index(virtual_map,pos)){
+
+        return -1;
+
+    }
+
+    set_bit_at_index(virtual_map,pos,true);
+    ((page_directory[pd]).pagetable)[pt].paddr = pa;
+
+    return 0;
+
 }
 
 
