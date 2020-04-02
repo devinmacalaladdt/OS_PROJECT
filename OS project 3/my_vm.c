@@ -99,7 +99,7 @@ void init(){
     unsigned int num_of_pte = (unsigned int)(pow(2,PTBITS));
 
     page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
-    int c = 0;
+    int c;
     for(c=0;c<num_of_pde;c++){
 
         (page_directory[c]).pagetable = (pte*)(malloc(sizeof(pte)*num_of_pte));
@@ -138,8 +138,7 @@ void set_physical_mem() {
  * Part 2: Add a virtual to physical page translation to the TLB.
  * Feel free to extend the function arguments or return type.
  */
-int
-add_TLB(void *va, void *pa)
+int add_TLB(void *va, void *pa)
 {
 
     /*Part 2 HINT: Add a virtual to physical page translation to the TLB */
@@ -153,10 +152,11 @@ add_TLB(void *va, void *pa)
  * Returns the physical page address.
  * Feel free to extend this function and change the return type.
  */
-pte_t *
-check_TLB(void *va) {
+pte_t * check_TLB(void *va) {
 
     /* Part 2: TLB lookup code here */
+
+	return NULL;
 
 }
 
@@ -165,8 +165,7 @@ check_TLB(void *va) {
  * Part 2: Print TLB miss rate.
  * Feel free to extend the function arguments or return type.
  */
-void
-print_TLB_missrate()
+void print_TLB_missrate()
 {
     double miss_rate = 0;	
 
@@ -193,9 +192,19 @@ pte_t *translate(pde_t *pgdir, void *va) {
     * translation exists, then you can return physical address from the TLB.
     */
 
+	pte_t* translation = check_TLB(va);
+	if (translation != NULL)
+		return translation; //In TLB so just return straight away
+	
+	translation = ((page_directory[get_top_bits((unsigned)va)]).pagetable[get_mid_bits((unsigned)va)]).paddr;
 
-    //If translation not successfull
-    return NULL; 
+	//TLB CACHE
+	add_TLB(va, translation);
+
+	return translation;
+
+    //If translation not successful
+    //return NULL; 
 }
 
 
@@ -205,15 +214,13 @@ as an argument, and sets a page table entry. This function will walk the page
 directory to see if there is an existing mapping for a virtual address. If the
 virtual address is not present, then a new entry will be added
 */
-int
-page_map(pde_t *pgdir, void *va, void *pa)
+int page_map(pde_t *pgdir, void *va, void *pa)
 {
 
     unsigned int pd = get_top_bits((unsigned int)va);
     unsigned int pt = get_mid_bits((unsigned int)va);
 
-    unsigned int pos = 0;
-    pos+=(pd*((unsigned int)(pow(2,PTBITS))));
+    unsigned int pos = (pd*((unsigned int)(pow(2,PTBITS))));
     pos+=pt;
 
     if(pos>=((unsigned int)(pow(2,PTBITS)+pow(2,PDBITS)))){
