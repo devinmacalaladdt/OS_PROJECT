@@ -148,7 +148,7 @@ int add_TLB(void *va, void *pa)
  * Returns the physical page address.
  * Feel free to extend this function and change the return type.
  */
-pte_t * check_TLB(void *va) {
+pte * check_TLB(void *va) {
 
     /* Part 2: TLB lookup code here */
 
@@ -179,7 +179,7 @@ void print_TLB_missrate()
 The function takes a virtual address and page directories starting address and
 performs translation to return the physical address
 */
-pte_t *translate(void *va) {
+pte *translate(void *va) {
     /* Part 1 HINT: Get the Page directory index (1st level) Then get the
     * 2nd-level-page table index using the virtual address.  Using the page
     * directory index and page table index get the physical address.
@@ -188,7 +188,7 @@ pte_t *translate(void *va) {
     * translation exists, then you can return physical address from the TLB.
     */
 
-	pte_t* translation = check_TLB(va);
+	pte * translation = check_TLB(va);
 	if (translation != NULL)
 		return translation; //In TLB so just return straight away
 	
@@ -291,7 +291,13 @@ void put_value(void *va, void *val, int size) {
      * function.
      */
 
+    unsigned int pages = size/PGSIZE;
+    int c;
+    for(c=0;c<pages;c++){
 
+
+
+    }
 
 
 }

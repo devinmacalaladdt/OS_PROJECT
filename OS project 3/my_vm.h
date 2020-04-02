@@ -54,7 +54,7 @@ typedef struct page_directory_entry{
 
 
 void set_physical_mem();
-pte_t* translate(void *va);
+pte * translate(void *va);
 int page_map(void *va, void* pa);
 bool check_in_tlb(void *va);
 void put_in_tlb(void *va, void *pa);
