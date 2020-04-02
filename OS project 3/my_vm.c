@@ -5,7 +5,9 @@ char *virtual_map;//bit map for virtual pages
 char *physical_mem;//byte array of physical memory
 pde * page_directory;//page directory (array of page directory entries)
 bool initialized = false;//global boolean, set to true after first a_malloc call
-
+int pgbits;
+int ptbits;
+int pdbits;
 
 // Example 1 EXTRACTING TOP-BITS (Outer bits)
 
@@ -14,7 +16,7 @@ static unsigned int get_top_bits(unsigned int value)
     //Assume you would require just the higher order (outer)  bits, 
     //that is first few bits from a number (e.g., virtual address) 
     //So given an  unsigned int value, to extract just the higher order (outer)  “num_bits”
-    int num_bits_to_prune = 32 - PDBITS; //32 assuming we are using 32-bit address 
+    int num_bits_to_prune = 32 - pdbits; //32 assuming we are using 32-bit address 
     return (value >> num_bits_to_prune);
 }
 
@@ -30,14 +32,14 @@ static unsigned int get_mid_bits (unsigned int value)
    unsigned int mid_bits_value = 0;   
 
    // First you need to remove the lower order bits (e.g. PAGE offset bits). 
-   value =    value >> PGBITS; 
+   value =    value >> pgbits; 
 
 
    // Next, you need to build a mask to prune the outer bits. How do we build a mask?   
 
    // Step1: First, take a power of 2 for “num_middle_bits”  or simply,  a left shift of number 1.  
    // You could try this in your calculator too.
-   unsigned int outer_bits_mask =   (1 << PTBITS);  
+   unsigned int outer_bits_mask =   (1 << ptbits);  
 
    // Step 2: Now subtract 1, which would set a total of  “num_middle_bits”  to 1 
    outer_bits_mask = outer_bits_mask-1;
@@ -93,30 +95,14 @@ static int get_bit_at_index(char *bitmap, int index)
     return (int)(*region >> (index % 8)) & 0x1;
 }
 
-void init(){
-
-    unsigned int num_of_pde = (unsigned int)(pow(2,PDBITS));
-    unsigned int num_of_pte = (unsigned int)(pow(2,PTBITS));
-
-    page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
-    int c;
-    for(c=0;c<num_of_pde;c++){
-
-        (page_directory[c]).pagetable = (pte*)(malloc(sizeof(pte)*num_of_pte));
-        int i = 0;
-        for(i=0;i<num_of_pte;i++){
-
-            (((page_directory[c]).pagetable)[i]).paddr = 0;
-
-        }
-
-    }
-
-}
 /*
 Function responsible for allocating and setting your physical memory 
 */
 void set_physical_mem() {
+
+    pgbits = (int)log2(PGSIZE);
+    ptbits = pgbits-(int)log2(sizeof(pte));
+    pdbits = 32-pgbits-ptbits;
 
     //Allocate physical memory using mmap or malloc; this is the total size of
     //your memory you are simulating
@@ -126,8 +112,18 @@ void set_physical_mem() {
 
     memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
     memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
+
+    unsigned int num_of_pde = (unsigned int)(pow(2,pdbits));
+
+    page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
+    int c = 0;
+    for(c=0;c<num_of_pde;c++){
+
+        (page_directory[c]).pagetable = NULL;
+
+    }
     
-    init();//initialize page directory and page tables
+    //initialize page directory and page tables
     //HINT: Also calculate the number of physical and virtual pages and allocate
     //virtual and physical bitmaps and initialize them
 
@@ -183,7 +179,7 @@ void print_TLB_missrate()
 The function takes a virtual address and page directories starting address and
 performs translation to return the physical address
 */
-pte_t *translate(pde_t *pgdir, void *va) {
+pte_t *translate(void *va) {
     /* Part 1 HINT: Get the Page directory index (1st level) Then get the
     * 2nd-level-page table index using the virtual address.  Using the page
     * directory index and page table index get the physical address.
@@ -214,29 +210,28 @@ as an argument, and sets a page table entry. This function will walk the page
 directory to see if there is an existing mapping for a virtual address. If the
 virtual address is not present, then a new entry will be added
 */
-int page_map(pde_t *pgdir, void *va, void *pa)
+int
+page_map(void *va, void *pa)
 {
 
     unsigned int pd = get_top_bits((unsigned int)va);
     unsigned int pt = get_mid_bits((unsigned int)va);
+    unsigned int num_of_pte = (unsigned int)(pow(2,ptbits));
 
-    unsigned int pos = (pd*((unsigned int)(pow(2,PTBITS))));
-    pos+=pt;
+    if(((page_directory[pd]).pagetable)== NULL){
 
-    if(pos>=((unsigned int)(pow(2,PTBITS)+pow(2,PDBITS)))){
+        (page_directory[pd]).pagetable = (pte*)(malloc(sizeof(pte)*num_of_pte));
+        int c;
+        for(c=0;c<num_of_pte;c++){
 
-        return -1;
+            ((page_directory[pd]).pagetable)[c].paddr = NULL;
 
-    }
-
-    if(get_bit_at_index(virtual_map,pos)){
-
-        return -1;
+        }        
 
     }
 
-    set_bit_at_index(virtual_map,pos,true);
     ((page_directory[pd]).pagetable)[pt].paddr = pa;
+
 
     return 0;
 

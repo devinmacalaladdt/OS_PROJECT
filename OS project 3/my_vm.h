@@ -32,9 +32,7 @@ typedef struct page_table_entry{
 
 }pte;
 
-#define PGBITS (int)log2(PGSIZE)
-#define PTBITS PGBITS-(int)log2(sizeof(pte))
-#define PDBITS 32-PGBITS-PTBITS
+
 typedef struct page_directory_entry{
 
     pte*pagetable;//pointer to page table (array of page table entries)
@@ -56,8 +54,8 @@ typedef struct page_directory_entry{
 
 
 void set_physical_mem();
-pte_t* translate(pde_t *pgdir, void *va);
-int page_map(pde_t *pgdir, void *va, void* pa);
+pte_t* translate(void *va);
+int page_map(void *va, void* pa);
 bool check_in_tlb(void *va);
 void put_in_tlb(void *va, void *pa);
 void *a_malloc(unsigned int num_bytes);
@@ -66,6 +64,5 @@ void put_value(void *va, void *val, int size);
 void get_value(void *va, void *val, int size);
 void mat_mult(void *mat1, void *mat2, int size, void *answer);
 void print_TLB_missrate();
-void init();
 
 #endif
