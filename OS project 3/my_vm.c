@@ -291,11 +291,15 @@ void put_value(void *va, void *val, int size) {
      * function.
      */
 
-    unsigned int pages = size/PGSIZE;
-    int c;
+    int pages = (int)ceil(size/PGSIZE);
+    int c=0;
     for(c=0;c<pages;c++){
 
-
+        unsigned int addr = (unsigned int)va + (c*PGSIZE);
+        pte * pt = translate((void*)addr);
+        addr = (unsigned int)val + (c*PGSIZE);
+        memcpy(pt->paddr,(void*)addr,PGSIZE);
+        c++;
 
     }
 
@@ -310,6 +314,17 @@ void get_value(void *va, void *val, int size) {
     * "val" address. Assume you can access "val" directly by derefencing them.
     */
 
+    int pages = (int)ceil(size/PGSIZE);
+    int c=0;
+    for(c=0;c<pages;c++){
+
+        unsigned int addr = (unsigned int)va + (c*PGSIZE);
+        pte * pt = translate((void*)addr);
+        addr = (unsigned int)val + (c*PGSIZE);
+        memcpy((void*)addr,pt->paddr,PGSIZE);
+        c++;
+
+    }
 
 
 
@@ -330,7 +345,30 @@ void mat_mult(void *mat1, void *mat2, int size, void *answer) {
      * getting the values from two matrices, you will perform multiplication and 
      * store the result to the "answer array"
      */
+    int i = 0;
+    int j = 0;
+    int k = 0;
 
+    for(i=0;i<size;i++){
+        for(j=0;j<size;j++){
+            void * add;
+            *((int*)add)=0;
+            unsigned address_ans = (unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int));
+            for(k=0;k<size;k++){
+
+                unsigned int address_mat1 = (unsigned int)mat1 + ((i * size * sizeof(int))) + (k * sizeof(int));
+                unsigned int address_mat2 = (unsigned int)mat2 + ((k * size * sizeof(int))) + (j * sizeof(int));
+                void * val_mat1;
+                void * val_mat2;
+                get_value((void *)address_mat1, val_mat1, sizeof(int));
+                get_value((void *)address_mat2, val_mat2, sizeof(int));
+                *((int*)add) += (*((int*)val_mat1))*(*((int*)val_mat2));
+                put_value((void *)address_ans, add, sizeof(int));
+
+
+            }
+        }
+    }
        
 }
 

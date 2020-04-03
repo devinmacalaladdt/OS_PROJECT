@@ -8,8 +8,6 @@
 
 int main(){
 
-
-    set_physical_mem();
-    page_map(0,0);
+    
 
 }
