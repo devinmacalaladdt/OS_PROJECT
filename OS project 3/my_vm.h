@@ -21,11 +21,11 @@
 #define MEMSIZE 1024*1024*1024
 
 //ignore these two
-// Represents a page table entry
-typedef unsigned long pte_t;
+// // Represents a page table entry
+// typedef unsigned long pte_t;
 
-// Represents a page directory entry
-typedef unsigned long pde_t;
+// // Represents a page directory entry
+// typedef unsigned long pde_t;
 
 typedef struct page_table_entry{
 

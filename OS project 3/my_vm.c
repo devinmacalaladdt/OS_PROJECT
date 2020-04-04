@@ -108,8 +108,8 @@ void set_physical_mem() {
     //Allocate physical memory using mmap or malloc; this is the total size of
     //your memory you are simulating
     physical_mem = (unsigned char*)(malloc(sizeof(char)*MEMSIZE));
-    physical_map = (unsigned char*)(malloc(sizeof(char)*((MEMSIZE/PGSIZE)/8)));
-    virtual_map = (unsigned char*)(malloc(sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8)));
+    physical_map = (unsigned char*)(calloc(((MEMSIZE/PGSIZE)/8),sizeof(char)));
+    virtual_map = (unsigned char*)(calloc(((MAX_MEMSIZE/PGSIZE)/8),sizeof(char)));
 
     memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
     memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
@@ -338,7 +338,7 @@ void *a_malloc(unsigned int num_bytes) {
 */
 void a_free(void *va, int size) {
 	//input validation
-	if(va < 1 || size < 1 || ((unsigned)(va) + size) > pow(2, 32))
+	if((unsigned int)va < 1 || size < 1 || ((unsigned int)(va) + size) > pow(2, 32))
 		return;
 
     /* Part 1: Free the page table entries starting from this virtual address
@@ -387,98 +387,98 @@ void a_free(void *va, int size) {
     
 }
 
-//
-///* The function copies data pointed by "val" to physical
-// * memory pages using virtual address (va)
-//*/
-//void put_value(void *va, void *val, int size) {
-//
-//    /* HINT: Using the virtual address and translate(), find the physical page. Copy
-//     * the contents of "val" to a physical page. NOTE: The "size" value can be larger 
-//     * than one page. Therefore, you may have to find multiple pages using translate()
-//     * function.
-//     */
-//
-//    int pages = (int)ceil(size/PGSIZE);
-//    int c=0;
-//    for(c=0;c<pages;c++){
-//
-//        unsigned int addr = (unsigned int)va + (c*PGSIZE);
-//        pte * pt = translate((void*)addr);
-//        addr = (unsigned int)val + (c*PGSIZE);
-//        memcpy(pt->paddr,(void*)addr,PGSIZE);
-//        c++;
-//
-//    }
-//
-//
-//}
-//
-//
-///*Given a virtual address, this function copies the contents of the page to val*/
-//void get_value(void *va, void *val, int size) {
-//
-//    /* HINT: put the values pointed to by "va" inside the physical memory at given
-//    * "val" address. Assume you can access "val" directly by derefencing them.
-//    */
-//
-//    int pages = (int)ceil(size/PGSIZE);
-//    int c=0;
-//    for(c=0;c<pages;c++){
-//
-//        unsigned int addr = (unsigned int)va + (c*PGSIZE);
-//        pte * pt = translate((void*)addr);
-//        addr = (unsigned int)val + (c*PGSIZE);
-//        memcpy((void*)addr,pt->paddr,PGSIZE);
-//        c++;
-//
-//    }
-//
-//
-//
-//}
-//
-//
-//
-///*
-//This function receives two matrices mat1 and mat2 as an argument with size
-//argument representing the number of rows and columns. After performing matrix
-//multiplication, copy the result to answer.
-//*/
-//void mat_mult(void *mat1, void *mat2, int size, void *answer) {
-//
-//    /* Hint: You will index as [i * size + j] where  "i, j" are the indices of the
-//     * matrix accessed. Similar to the code in test.c, you will use get_value() to
-//     * load each element and perform multiplication. Take a look at test.c! In addition to 
-//     * getting the values from two matrices, you will perform multiplication and 
-//     * store the result to the "answer array"
-//     */
-//    int i = 0;
-//    int j = 0;
-//    int k = 0;
-//
-//    for(i=0;i<size;i++){
-//        for(j=0;j<size;j++){
-//            void * add;
-//            *((int*)add)=0;
-//            unsigned address_ans = (unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int));
-//            for(k=0;k<size;k++){
-//
-//                unsigned int address_mat1 = (unsigned int)mat1 + ((i * size * sizeof(int))) + (k * sizeof(int));
-//                unsigned int address_mat2 = (unsigned int)mat2 + ((k * size * sizeof(int))) + (j * sizeof(int));
-//                void * val_mat1;
-//                void * val_mat2;
-//                get_value((void *)address_mat1, val_mat1, sizeof(int));
-//                get_value((void *)address_mat2, val_mat2, sizeof(int));
-//                *((int*)add) += (*((int*)val_mat1))*(*((int*)val_mat2));
-//                put_value((void *)address_ans, add, sizeof(int));
-//
-//
-//            }
-//        }
-//    }
-//       
-//}
+
+/* The function copies data pointed by "val" to physical
+* memory pages using virtual address (va)
+*/
+void put_value(void *va, void *val, int size) {
+
+   /* HINT: Using the virtual address and translate(), find the physical page. Copy
+    * the contents of "val" to a physical page. NOTE: The "size" value can be larger 
+    * than one page. Therefore, you may have to find multiple pages using translate()
+    * function.
+    */
+
+   int pages = (int)ceil(size/PGSIZE);
+   int c=0;
+   for(c=0;c<pages;c++){
+
+       unsigned int addr = (unsigned int)va + (c*PGSIZE);
+       void * pa = translate((void*)addr);
+       addr = (unsigned int)val + (c*PGSIZE);
+       memcpy(pa,(void*)addr,PGSIZE);
+       c++;
+
+   }
+
+
+}
+
+
+/*Given a virtual address, this function copies the contents of the page to val*/
+void get_value(void *va, void *val, int size) {
+
+   /* HINT: put the values pointed to by "va" inside the physical memory at given
+   * "val" address. Assume you can access "val" directly by derefencing them.
+   */
+
+   int pages = (int)ceil(size/PGSIZE);
+   int c=0;
+   for(c=0;c<pages;c++){
+
+       unsigned int addr = (unsigned int)va + (c*PGSIZE);
+       void * pa = translate((void*)addr);
+       addr = (unsigned int)val + (c*PGSIZE);
+       memcpy((void*)addr,pa,PGSIZE);
+       c++;
+
+   }
+
+
+
+}
+
+
+
+/*
+This function receives two matrices mat1 and mat2 as an argument with size
+argument representing the number of rows and columns. After performing matrix
+multiplication, copy the result to answer.
+*/
+void mat_mult(void *mat1, void *mat2, int size, void *answer) {
+
+   /* Hint: You will index as [i * size + j] where  "i, j" are the indices of the
+    * matrix accessed. Similar to the code in test.c, you will use get_value() to
+    * load each element and perform multiplication. Take a look at test.c! In addition to 
+    * getting the values from two matrices, you will perform multiplication and 
+    * store the result to the "answer array"
+    */
+   int i = 0;
+   int j = 0;
+   int k = 0;
+
+   for(i=0;i<size;i++){
+       for(j=0;j<size;j++){
+           void * add;
+           *((int*)add)=0;
+           unsigned address_ans = (unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int));
+           for(k=0;k<size;k++){
+
+               unsigned int address_mat1 = (unsigned int)mat1 + ((i * size * sizeof(int))) + (k * sizeof(int));
+               unsigned int address_mat2 = (unsigned int)mat2 + ((k * size * sizeof(int))) + (j * sizeof(int));
+               void * val_mat1;
+               void * val_mat2;
+               get_value((void *)address_mat1, val_mat1, sizeof(int));
+               get_value((void *)address_mat2, val_mat2, sizeof(int));
+               *((int*)add) += (*((int*)val_mat1))*(*((int*)val_mat2));
+               put_value((void *)address_ans, add, sizeof(int));
+
+
+           }
+       }
+   }
+      
+}
 
 
 
