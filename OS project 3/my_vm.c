@@ -111,8 +111,8 @@ void set_physical_mem() {
     physical_map = (unsigned char*)(calloc(((MEMSIZE/PGSIZE)/8),sizeof(char)));
     virtual_map = (unsigned char*)(calloc(((MAX_MEMSIZE/PGSIZE)/8),sizeof(char)));
 
-    memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
-    memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
+    //memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
+    //memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
 
     unsigned int num_of_pde = (unsigned int)(pow(2,pdbits));
 
@@ -254,9 +254,9 @@ int page_map(void *va, void *pa)
 
 /*Function that gets the next available page
 */
-void *get_next_avail(unsigned num_pages, unsigned char* bitmap) {
+void *get_next_avail(unsigned num_pages, unsigned char* bitmap, unsigned long memSize) {
 	unsigned chain = 0, index, avail = 0, bit;
-	for (index = 0; index < ((MAX_MEMSIZE / PGSIZE) / 8); index++) {
+	for (index = 0; index < ((memSize / PGSIZE) / 8); index++) {
 		if (bitmap[index] == 0b11111111)
 			continue;//optimization to skip 8 unnecessary checks
 		for (bit = 0; bit < 8; bit++) {
@@ -312,16 +312,16 @@ void *a_malloc(unsigned int num_bytes) {
 	//unsigned numPages = ceil((double)(num_bytes / PGSIZE));
 	unsigned numPages = (num_bytes / PGSIZE) + 1;
 	//pthread_mutex_lock(&lock);
-	void* va = get_next_avail(numPages, virtual_map);
+	void* va = get_next_avail(numPages, virtual_map, MAX_MEMSIZE);
 	//pthread_mutex_unlock(&lock);
 	if (va == NULL)
 		return NULL; // no space or no consecutive space for the request
 	//pthread_mutex_lock(&lock);
-	void* pa = get_next_avail(numPages, physical_map);
+	void* pa = get_next_avail(numPages, physical_map, MEMSIZE);
 	//pthread_mutex_unlock(&lock);
 	if (pa == NULL)
 		return NULL; //not enough physical space
-
+	pa = physical_mem + (unsigned long)pa;
 	int x;
 	void* firstPageVA = va;
 	for (x = 0; x < numPages; x++) {
@@ -460,7 +460,8 @@ void mat_mult(void *mat1, void *mat2, int size, void *answer) {
    for(i=0;i<size;i++){
        for(j=0;j<size;j++){
            void * add;
-           *((int*)add)=0;
+		   int add2 = 0;
+		   add = &add2;
            unsigned address_ans = (unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int));
            for(k=0;k<size;k++){
 
