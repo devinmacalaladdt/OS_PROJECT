@@ -254,7 +254,7 @@ int page_map(void *va, void *pa)
 
 /*Function that gets the next available page
 */
-void *get_next_avail(unsigned num_pages, unsigned char* bitmap, unsigned long memSize) {
+void *get_next_avail(unsigned num_pages, unsigned char* bitmap, unsigned long long memSize) {
 	unsigned chain = 0, index, avail = 0, bit;
 	for (index = 0; index < ((memSize / PGSIZE) / 8); index++) {
 		if (bitmap[index] == 0b11111111)
@@ -459,20 +459,18 @@ void mat_mult(void *mat1, void *mat2, int size, void *answer) {
 
    for(i=0;i<size;i++){
        for(j=0;j<size;j++){
-           void * add;
-		   int add2 = 0;
-		   add = &add2;
+           int add = 0;
            unsigned address_ans = (unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int));
            for(k=0;k<size;k++){
 
                unsigned int address_mat1 = (unsigned int)mat1 + ((i * size * sizeof(int))) + (k * sizeof(int));
                unsigned int address_mat2 = (unsigned int)mat2 + ((k * size * sizeof(int))) + (j * sizeof(int));
-               void * val_mat1;
-               void * val_mat2;
-               get_value((void *)address_mat1, val_mat1, sizeof(int));
-               get_value((void *)address_mat2, val_mat2, sizeof(int));
-               *((int*)add) += (*((int*)val_mat1))*(*((int*)val_mat2));
-               put_value((void *)address_ans, add, sizeof(int));
+               int val_mat1;
+               int val_mat2;
+               get_value((void *)address_mat1,(void*)&val_mat1, sizeof(int));
+               get_value((void *)address_mat2, (void*)&val_mat2, sizeof(int));
+               add += (val_mat1)*(val_mat2);
+               put_value((void *)address_ans, (void*)&add, sizeof(int));
 
 
            }
