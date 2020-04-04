@@ -399,7 +399,7 @@ void put_value(void *va, void *val, int size) {
     * function.
     */
 
-   int pages = (int)ceil(size/PGSIZE);
+   int pages = (int)(ceil((double)size/PGSIZE));
    int c=0;
    for(c=0;c<pages;c++){
 
@@ -422,7 +422,7 @@ void get_value(void *va, void *val, int size) {
    * "val" address. Assume you can access "val" directly by derefencing them.
    */
 
-   int pages = (int)ceil(size/PGSIZE);
+   int pages = (int)(ceil((double)size/PGSIZE));
    int c=0;
    for(c=0;c<pages;c++){
 
