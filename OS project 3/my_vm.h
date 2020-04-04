@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+//#include <pthread.h>
 
 //Assume the address space is 32 bits, so the max memory size is 4GB
 //Page size is 4KB
@@ -54,7 +55,7 @@ typedef struct page_directory_entry{
 
 
 void set_physical_mem();
-pte * translate(void *va);
+void * translate(void *va);
 int page_map(void *va, void* pa);
 bool check_in_tlb(void *va);
 void put_in_tlb(void *va, void *pa);
