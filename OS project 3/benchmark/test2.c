@@ -8,15 +8,16 @@
 
 int main(){
 
-    void * a = a_malloc(sizeof(int));
-    printf("a:%p\n",a);
+    void * a = a_malloc(sizeof(int)*2);
+    printf("1 a:%p\n",a);
     int x = 9;
-    int y = 0;
+    int y = 0;//8049050
     put_value(a,(void*)&x,sizeof(int));
+    printf("2 a:%p\n",a);
     get_value(a,(void*)&y,sizeof(int));
-    printf("fevdvd\n");
+    printf("3 a:%p\n",a);
     printf("y:%d\n",y);
-    printf("a:%p\n",a);
+    printf("4 a:%p\n",a);
     a_free(a,sizeof(int));
 
 }

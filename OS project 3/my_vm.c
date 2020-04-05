@@ -406,8 +406,15 @@ void put_value(void *va, void *val, int size) {
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
-       memcpy(pa,(void*)addr,PGSIZE);
-       c++;
+       if(c==(pages-1)){
+
+            memcpy(pa,(void*)addr,size%PGSIZE);
+
+       }else{
+
+            memcpy(pa,(void*)addr,PGSIZE);
+
+       }
 
    }
 
@@ -429,8 +436,15 @@ void get_value(void *va, void *val, int size) {
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
-       memcpy((void*)addr,pa,PGSIZE);
-       c++;
+       if(c==(pages-1)){
+
+            memcpy((void*)addr,pa,size%PGSIZE);
+
+       }else{
+
+            memcpy((void*)addr,pa,PGSIZE);
+
+       }
 
    }
 
