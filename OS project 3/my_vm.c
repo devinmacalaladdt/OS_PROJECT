@@ -11,6 +11,9 @@ int ptbits;
 int pdbits;
 //pthread_mutex_t lock;
 
+/*TLB Miss Rate Globals*/
+unsigned tlbLookup = 0, tlbMiss = 0;
+
 // Example 1 EXTRACTING TOP-BITS (Outer bits)
 
 static unsigned int get_top_bits(unsigned int value)
@@ -113,7 +116,7 @@ void set_physical_mem() {
     virtual_map = (unsigned char*)(calloc(((MAX_MEMSIZE/PGSIZE)/8),sizeof(char)));
 
     tlb_list = (tlb*)(malloc(sizeof(tlb)*TLB_ENTRIES));
-    int c = 0;
+    unsigned c = 0;
     for(c=0;c<TLB_ENTRIES;c++){
 
         (tlb_list[c]).valid = false;
@@ -124,8 +127,8 @@ void set_physical_mem() {
     //memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
 
     unsigned int num_of_pde = (unsigned int)(pow(2,pdbits));
-
     page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
+
     for(c=0;c<num_of_pde;c++){
 
         (page_directory[c]).pagetable = NULL;
@@ -183,11 +186,11 @@ int remove_TLB(void *va)
  * Feel free to extend this function and change the return type.
  */
 void * check_TLB(void *va) {
-
+	tlbLookup++;
 	/* Part 2: TLB lookup code here */
     unsigned int map = ((unsigned int)va)>>pgbits;
     if((tlb_list[map%TLB_ENTRIES]).valid==false){
-
+		tlbMiss++;
         return NULL;
 
     }
@@ -202,12 +205,9 @@ void * check_TLB(void *va) {
  */
 void print_TLB_missrate()
 {
-	double miss_rate = 0;
-
+	double miss_rate = 0; /*TLB Misses / TLB Lookups*/
+	miss_rate = tlbMiss / tlbLookup; // inc in checkTLB
 	/*Part 2 Code here to calculate and print the TLB miss rate*/
-
-
-
 
 	fprintf(stderr, "TLB miss rate %lf \n", miss_rate);
 }
@@ -260,7 +260,7 @@ int page_map(void *va, void *pa)
 	if (((page_directory[pd]).pagetable) == NULL) {
 
 		(page_directory[pd]).pagetable = (pte*)(malloc(sizeof(pte)*num_of_pte));
-		int c;
+		unsigned c;
 		for (c = 0; c < num_of_pte; c++) {
 
 			((page_directory[pd]).pagetable)[c].paddr = NULL;
@@ -294,7 +294,7 @@ void *get_next_avail(unsigned num_pages, unsigned char* bitmap, unsigned long lo
 				chain = 0;
 			if (chain == num_pages) {
 				//claim the bits
-				int x;
+				unsigned x;
 				index = avail / 8;
 				bit = avail % 8;
 				for (x = 1; x <= chain; x++) {
@@ -347,7 +347,7 @@ void *a_malloc(unsigned int num_bytes) {
 	if (pa == NULL)
 		return NULL; //not enough physical space
 	pa = physical_mem + (unsigned long)pa;
-	int x;
+	unsigned x;
 	void* firstPageVA = va;
 	for (x = 0; x < numPages; x++) {
 		page_map(va, pa);
@@ -381,7 +381,7 @@ void a_free(void *va, int size) {
 	unsigned page = (unsigned)(pa) / PGSIZE;
 	unsigned index = page / 8;
 	unsigned bit = page % 8;
-	int x;
+	unsigned x;
 	//pthread_mutex_lock(&lock);
 	for (x = 0; x < numPages; x++) {
 		if (((physical_map[index] >> bit) & 1) == 1) {
