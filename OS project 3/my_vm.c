@@ -206,7 +206,7 @@ void * check_TLB(void *va) {
 void print_TLB_missrate()
 {
 	double miss_rate = 0; /*TLB Misses / TLB Lookups*/
-	miss_rate = tlbMiss / tlbLookup; // inc in checkTLB
+	miss_rate = ((double)tlbMiss / tlbLookup); // inc in checkTLB
 	/*Part 2 Code here to calculate and print the TLB miss rate*/
 
 	fprintf(stderr, "TLB miss rate %lf \n", miss_rate);
