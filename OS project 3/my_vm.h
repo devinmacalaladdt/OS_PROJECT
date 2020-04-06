@@ -43,23 +43,27 @@ typedef struct page_directory_entry{
 
 #define TLB_ENTRIES 512
 
-//Structure to represents TLB
-//struct tlb {
+typedef struct _tlb {
     /*Assume your TLB is a direct mapped TLB with number of entries as TLB_ENTRIES
     * Think about the size of each TLB entry that performs virtual to physical
     * address translation.
     */
+   void * va;
+   void * pa;
+   bool valid;
 	
-//};
-//struct tlb tlb_store;
+}tlb;
+
 
 
 void set_physical_mem();
 void * translate(void *va);
 int page_map(void *va, void* pa);
-bool check_in_tlb(void *va);
-void put_in_tlb(void *va, void *pa);
+void * check_TLB(void *va);
+int add_TLB(void *va, void *pa);
+int remove_TLB(void *va);
 void *a_malloc(unsigned int num_bytes);
+void *get_next_avail(unsigned num_pages, unsigned char* bitmap, unsigned long long memSize);
 void a_free(void *va, int size);
 void put_value(void *va, void *val, int size);
 void get_value(void *va, void *val, int size);

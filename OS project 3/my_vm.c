@@ -4,6 +4,7 @@ char *physical_map;//bit map for physical pages
 char *virtual_map;//bit map for virtual pages
 char *physical_mem;//byte array of physical memory
 pde * page_directory;//page directory (array of page directory entries)
+tlb * tlb_list;
 bool initialized = false;//global boolean, set to true after first a_malloc call
 int pgbits;
 int ptbits;
@@ -111,13 +112,20 @@ void set_physical_mem() {
     physical_map = (unsigned char*)(calloc(((MEMSIZE/PGSIZE)/8),sizeof(char)));
     virtual_map = (unsigned char*)(calloc(((MAX_MEMSIZE/PGSIZE)/8),sizeof(char)));
 
+    tlb_list = (tlb*)(malloc(sizeof(tlb)*TLB_ENTRIES));
+    int c = 0;
+    for(c=0;c<TLB_ENTRIES;c++){
+
+        (tlb_list[c]).valid = false;
+
+    }
+
     //memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
     //memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
 
     unsigned int num_of_pde = (unsigned int)(pow(2,pdbits));
 
     page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
-    int c = 0;
     for(c=0;c<num_of_pde;c++){
 
         (page_directory[c]).pagetable = NULL;
@@ -128,7 +136,7 @@ void set_physical_mem() {
 		printf("\n mutex init has failed\n");
 	}*/
 
-	initialized = 1;
+	initialized = true;
 
     //initialize page directory and page tables
     //HINT: Also calculate the number of physical and virtual pages and allocate
@@ -145,16 +153,27 @@ int add_TLB(void *va, void *pa)
 {
 
     /*Part 2 HINT: Add a virtual to physical page translation to the TLB */
+    unsigned int map = ((unsigned int)va)>>pgbits;
+    if(tlb_list[map%TLB_ENTRIES].valid){
 
-    return -1;
+        remove_TLB(va);
+
+    }
+    (tlb_list[map%TLB_ENTRIES]).valid = true;
+    (tlb_list[map%TLB_ENTRIES]).va = va;
+    (tlb_list[map%TLB_ENTRIES]).pa = pa;
+    return 0;
 }
 
 int remove_TLB(void *va)
 {
 
 	/*Part 2 HINT: Remove a virtual to physical page translation from the TLB */
-
-	return -1;
+    unsigned int map = ((unsigned int)va)>>pgbits;
+    (tlb_list[map%TLB_ENTRIES]).va=NULL;
+    (tlb_list[map%TLB_ENTRIES]).pa=NULL;
+    (tlb_list[map%TLB_ENTRIES]).valid = false;
+	return 0;
 }
 
 
@@ -163,11 +182,16 @@ int remove_TLB(void *va)
  * Returns the physical page address.
  * Feel free to extend this function and change the return type.
  */
-pte * check_TLB(void *va) {
+void * check_TLB(void *va) {
 
 	/* Part 2: TLB lookup code here */
+    unsigned int map = ((unsigned int)va)>>pgbits;
+    if((tlb_list[map%TLB_ENTRIES]).valid==false){
 
-	return NULL;
+        return NULL;
+
+    }
+    return (tlb_list[map%TLB_ENTRIES]).pa;
 
 }
 
@@ -230,6 +254,7 @@ int page_map(void *va, void *pa)
 
 	unsigned int pd = get_top_bits((unsigned int)va);
 	unsigned int pt = get_mid_bits((unsigned int)va);
+    
 	unsigned int num_of_pte = (unsigned int)(pow(2, ptbits));
 
 	if (((page_directory[pd]).pagetable) == NULL) {
