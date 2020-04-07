@@ -9,7 +9,7 @@ bool initialized = false;//global boolean, set to true after first a_malloc call
 int pgbits;
 int ptbits;
 int pdbits;
-//pthread_mutex_t lock;
+pthread_mutex_t lock;
 
 /*TLB Miss Rate Globals*/
 unsigned tlbLookup = 0, tlbMiss = 0;
@@ -135,9 +135,9 @@ void set_physical_mem() {
 
     }
     
-	/*if (pthread_mutex_init(&lock, NULL) != 0) {
+	if (pthread_mutex_init(&lock, NULL) != 0) {
 		printf("\n mutex init has failed\n");
-	}*/
+	}
 
 	initialized = true;
 
@@ -227,14 +227,22 @@ void *translate(void *va) {
 	* translation exists, then you can return physical address from the TLB.
 	*/
 
+    pthread_mutex_lock(&lock);
+
 	void * translation = check_TLB(va);
+
+    pthread_mutex_unlock(&lock);
 	if (translation != NULL)
 		return translation; //In TLB so just return straight away
 
 	translation = ((page_directory[get_top_bits((unsigned)va)]).pagetable[get_mid_bits((unsigned)va)]).paddr;
 
 	//TLB CACHE
+    pthread_mutex_lock(&lock);
 	add_TLB(va, translation);
+    pthread_mutex_unlock(&lock);
+
+    
 
 	return translation;
 
@@ -257,6 +265,8 @@ int page_map(void *va, void *pa)
     
 	unsigned int num_of_pte = (unsigned int)(pow(2, ptbits));
 
+    pthread_mutex_lock(&lock);
+
 	if (((page_directory[pd]).pagetable) == NULL) {
 
 		(page_directory[pd]).pagetable = (pte*)(malloc(sizeof(pte)*num_of_pte));
@@ -270,6 +280,8 @@ int page_map(void *va, void *pa)
 	}
 
 	((page_directory[pd]).pagetable)[pt].paddr = pa;
+
+    pthread_mutex_unlock(&lock);
 
 
 	return 0;
@@ -336,14 +348,14 @@ void *a_malloc(unsigned int num_bytes) {
 
 	//unsigned numPages = ceil((double)(num_bytes / PGSIZE));
 	unsigned numPages = (num_bytes / PGSIZE) + 1;
-	//pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock);
 	void* va = get_next_avail(numPages, virtual_map, MAX_MEMSIZE);
-	//pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock);
 	if (va == NULL)
 		return NULL; // no space or no consecutive space for the request
-	//pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock);
 	void* pa = get_next_avail(numPages, physical_map, MEMSIZE);
-	//pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock);
 	if (pa == NULL)
 		return NULL; //not enough physical space
 	pa = physical_mem + (unsigned long)pa;
@@ -382,7 +394,7 @@ void a_free(void *va, int size) {
 	unsigned index = page / 8;
 	unsigned bit = page % 8;
 	unsigned x;
-	//pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock);
 	for (x = 0; x < numPages; x++) {
 		if (((physical_map[index] >> bit) & 1) == 1) {
 			physical_map[index] &= ~(1 << bit);
@@ -391,13 +403,13 @@ void a_free(void *va, int size) {
 		bit = page % 8;
 		index = page / 8;
 	}
-	//pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock);
 
 	page = (unsigned)(va) / PGSIZE;
 	index = page / 8;
 	bit = page % 8;
 
-	//pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock);
 	for (x = 0; x < numPages; x++) {
 		if (((virtual_map[index] >> bit) & 1) == 1) {
 			virtual_map[index] &= ~(1 << bit);
@@ -406,7 +418,7 @@ void a_free(void *va, int size) {
 		bit = page % 8;
 		index = page / 8;
 	}
-	//pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock);
 
 	remove_TLB(va);
     
@@ -431,6 +443,7 @@ void put_value(void *va, void *val, int size) {
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
+       pthread_mutex_lock(&lock);
        if(c==(pages-1)){
 
             memcpy(pa,(void*)addr,size%PGSIZE);
@@ -440,6 +453,7 @@ void put_value(void *va, void *val, int size) {
             memcpy(pa,(void*)addr,PGSIZE);
 
        }
+       pthread_mutex_unlock(&lock);
 
    }
 
@@ -461,6 +475,7 @@ void get_value(void *va, void *val, int size) {
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
+       pthread_mutex_lock(&lock);
        if(c==(pages-1)){
 
             memcpy((void*)addr,pa,size%PGSIZE);
@@ -470,6 +485,7 @@ void get_value(void *va, void *val, int size) {
             memcpy((void*)addr,pa,PGSIZE);
 
        }
+       pthread_mutex_unlock(&lock);
 
    }
 
