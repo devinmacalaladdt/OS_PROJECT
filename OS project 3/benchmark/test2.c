@@ -8,19 +8,13 @@
 
 void print_thread(void* start){
 
-    printf("a\n");
     void * a = a_malloc(sizeof(int));
-printf("%u\n", ((unsigned) a));
-    printf("b\n");
     int x = *((int*)start);
     int y = 0;
     put_value(a,(void*)&x,sizeof(int));
-    printf("c\n");
     get_value(a,(void*)&y,sizeof(int));
-    printf("d\n");
     printf("s:%d, e:%d\n",x,y);
     a_free(a,sizeof(int));
-    printf("e\n");
 
 }
 
@@ -32,9 +26,15 @@ int main(){
     for(c=0;c<10;c++){
 
 	    num[c]=c;
-        pthread_create(&(threads[c]), NULL, print_thread, num+c); 
+        pthread_create(&(threads[c]), NULL, print_thread, num+c);
 
     }
+    for(c=0;c<10;c++){
+
+        pthread_join(&(threads[c]), NULL);
+
+    }
+    print_TLB_missrate();
 
 
 
