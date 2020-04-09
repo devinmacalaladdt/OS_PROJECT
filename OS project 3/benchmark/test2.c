@@ -6,18 +6,33 @@
 #define SIZE 5
 #define ARRAY_SIZE 400
 
+void print_thread(void* start){
+
+    printf("a\n");
+    void * a = a_malloc(sizeof(int));
+    printf("b\n");
+    int x = *((int*)start);
+    int y = 0;
+    put_value(a,(void*)&x,sizeof(int));
+    printf("c\n");
+    get_value(a,(void*)&y,sizeof(int));
+    printf("d\n");
+    printf("%d\n",y);
+    a_free(a,sizeof(int));
+    printf("e\n");
+
+}
+
 int main(){
 
-    void * a = a_malloc(sizeof(int)*2);
-    printf("1 a:%p\n",a);
-    int x = 9;
-    int y = 0;//8049050
-    put_value(a,(void*)&x,sizeof(int));
-    printf("2 a:%p\n",a);
-    get_value(a,(void*)&y,sizeof(int));
-    printf("3 a:%p\n",a);
-    printf("y:%d\n",y);
-    printf("4 a:%p\n",a);
-    a_free(a,sizeof(int));
+    pthread_t threads[10];
+    int c = 0;
+    for(c=0;c<50;c++){
+
+        pthread_create(&(threads[c]), NULL, print_thread, &c); 
+
+    }
+
+
 
 }

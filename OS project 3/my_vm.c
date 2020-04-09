@@ -9,7 +9,12 @@ bool initialized = false;//global boolean, set to true after first a_malloc call
 int pgbits;
 int ptbits;
 int pdbits;
-pthread_mutex_t lock;
+pthread_mutex_t lock_pbmap;
+pthread_mutex_t lock_vbmap;
+pthread_mutex_t lock_pmem;
+pthread_mutex_t lock_pd;
+pthread_mutex_t lock_tlb;
+pthread_mutex_t lock_init;
 
 /*TLB Miss Rate Globals*/
 unsigned tlbLookup = 0, tlbMiss = 0;
@@ -105,47 +110,62 @@ Function responsible for allocating and setting your physical memory
 */
 void set_physical_mem() {
 
-    pgbits = (int)log2(PGSIZE);
-    ptbits = pgbits-(int)log2(sizeof(pte));
-    pdbits = 32-pgbits-ptbits;
 
-    //Allocate physical memory using mmap or malloc; this is the total size of
-    //your memory you are simulating
-    physical_mem = (unsigned char*)(malloc(sizeof(char)*MEMSIZE));
-    physical_map = (unsigned char*)(calloc(((MEMSIZE/PGSIZE)/8),sizeof(char)));
-    virtual_map = (unsigned char*)(calloc(((MAX_MEMSIZE/PGSIZE)/8),sizeof(char)));
+        pgbits = (int)log2(PGSIZE);
+        ptbits = pgbits-(int)log2(sizeof(pte));
+        pdbits = 32-pgbits-ptbits;
 
-    tlb_list = (tlb*)(malloc(sizeof(tlb)*TLB_ENTRIES));
-    unsigned c = 0;
-    for(c=0;c<TLB_ENTRIES;c++){
+        //Allocate physical memory using mmap or malloc; this is the total size of
+        //your memory you are simulating
+        physical_mem = (unsigned char*)(malloc(sizeof(char)*MEMSIZE));
+        physical_map = (unsigned char*)(calloc(((MEMSIZE/PGSIZE)/8),sizeof(char)));
+        virtual_map = (unsigned char*)(calloc(((MAX_MEMSIZE/PGSIZE)/8),sizeof(char)));
 
-        (tlb_list[c]).valid = false;
+        tlb_list = (tlb*)(malloc(sizeof(tlb)*TLB_ENTRIES));
+        unsigned c = 0;
+        for(c=0;c<TLB_ENTRIES;c++){
 
-    }
+            (tlb_list[c]).valid = false;
 
-    //memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
-    //memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
+        }
 
-    unsigned int num_of_pde = (unsigned int)(pow(2,pdbits));
-    page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
+        //memset(physical_map,0,sizeof(char)*((MEMSIZE/PGSIZE)/8));//zero out bit maps
+        //memset(virtual_map,0,sizeof(char)*((MAX_MEMSIZE/PGSIZE)/8));
 
-    for(c=0;c<num_of_pde;c++){
+        unsigned int num_of_pde = (unsigned int)(pow(2,pdbits));
+        page_directory = (pde*)(malloc(sizeof(pde)*num_of_pde));
 
-        (page_directory[c]).pagetable = NULL;
+        for(c=0;c<num_of_pde;c++){
+
+            (page_directory[c]).pagetable = NULL;
+
+        }
+
+        if (pthread_mutex_init(&lock_pbmap, NULL) != 0) {
+            printf("\n mutex init has failed\n");
+        }
+        if (pthread_mutex_init(&lock_vbmap, NULL) != 0) {
+            printf("\n mutex init has failed\n");
+        }
+        if (pthread_mutex_init(&lock_pmem, NULL) != 0) {
+            printf("\n mutex init has failed\n");
+        }
+        if (pthread_mutex_init(&lock_tlb, NULL) != 0) {
+            printf("\n mutex init has failed\n");
+        }
+        if (pthread_mutex_init(&lock_pd, NULL) != 0) {
+            printf("\n mutex init has failed\n");
+        }
+
 
     }
     
-	if (pthread_mutex_init(&lock, NULL) != 0) {
-		printf("\n mutex init has failed\n");
-	}
-
-	initialized = true;
 
     //initialize page directory and page tables
     //HINT: Also calculate the number of physical and virtual pages and allocate
     //virtual and physical bitmaps and initialize them
 
-}
+
 
 
 /*
@@ -227,20 +247,21 @@ void *translate(void *va) {
 	* translation exists, then you can return physical address from the TLB.
 	*/
 
-    pthread_mutex_lock(&lock);
-
+    pthread_mutex_lock(&lock_tlb);
 	void * translation = check_TLB(va);
+    pthread_mutex_unlock(&lock_tlb);
 
-    pthread_mutex_unlock(&lock);
 	if (translation != NULL)
 		return translation; //In TLB so just return straight away
 
+    pthread_mutex_lock(&lock_pd);
 	translation = ((page_directory[get_top_bits((unsigned)va)]).pagetable[get_mid_bits((unsigned)va)]).paddr;
+    pthread_mutex_unlock(&lock_pd);
 
 	//TLB CACHE
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&lock_tlb);
 	add_TLB(va, translation);
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock_tlb);
 
     
 
@@ -265,7 +286,7 @@ int page_map(void *va, void *pa)
     
 	unsigned int num_of_pte = (unsigned int)(pow(2, ptbits));
 
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&lock_pd);
 
 	if (((page_directory[pd]).pagetable) == NULL) {
 
@@ -281,7 +302,7 @@ int page_map(void *va, void *pa)
 
 	((page_directory[pd]).pagetable)[pt].paddr = pa;
 
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock_pd);
 
 
 	return 0;
@@ -336,8 +357,18 @@ void *a_malloc(unsigned int num_bytes) {
      * HINT: If the physical memory is not yet initialized, then allocate and initialize.
      */
 
-	if (!initialized)
-		set_physical_mem();
+	if (initialized==false){
+
+        if (pthread_mutex_init(&lock_init, NULL) != 0) {
+            printf("\n mutex init has failed\n");
+        }
+        pthread_mutex_lock(&lock_init);
+        initialized=true;
+        set_physical_mem();
+        pthread_mutex_unlock(&lock_init);
+
+    }
+		
 
    /* 
     * HINT: If the page directory is not initialized, then initialize the
@@ -346,16 +377,16 @@ void *a_malloc(unsigned int num_bytes) {
     * have to mark which physical pages are used. 
     */
 
-	//unsigned numPages = ceil((double)(num_bytes / PGSIZE));
+	//unsigned numPages = ceil(((double)num_bytes / PGSIZE));
 	unsigned numPages = (num_bytes / PGSIZE) + 1;
-	pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock_vbmap);
 	void* va = get_next_avail(numPages, virtual_map, MAX_MEMSIZE);
-	pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock_vbmap);
 	if (va == NULL)
 		return NULL; // no space or no consecutive space for the request
-	pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock_pbmap);
 	void* pa = get_next_avail(numPages, physical_map, MEMSIZE);
-	pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock_pbmap);
 	if (pa == NULL)
 		return NULL; //not enough physical space
 	pa = physical_mem + (unsigned long)pa;
@@ -394,7 +425,7 @@ void a_free(void *va, int size) {
 	unsigned index = page / 8;
 	unsigned bit = page % 8;
 	unsigned x;
-	pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock_pbmap);
 	for (x = 0; x < numPages; x++) {
 		if (((physical_map[index] >> bit) & 1) == 1) {
 			physical_map[index] &= ~(1 << bit);
@@ -403,13 +434,13 @@ void a_free(void *va, int size) {
 		bit = page % 8;
 		index = page / 8;
 	}
-	pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock_pbmap);
 
 	page = (unsigned)(va) / PGSIZE;
 	index = page / 8;
 	bit = page % 8;
 
-	pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock_vbmap);
 	for (x = 0; x < numPages; x++) {
 		if (((virtual_map[index] >> bit) & 1) == 1) {
 			virtual_map[index] &= ~(1 << bit);
@@ -418,9 +449,11 @@ void a_free(void *va, int size) {
 		bit = page % 8;
 		index = page / 8;
 	}
-	pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock_vbmap);
 
+    pthread_mutex_lock(&lock_tlb);
 	remove_TLB(va);
+    pthread_mutex_unlock(&lock_tlb);
     
 }
 
@@ -443,7 +476,7 @@ void put_value(void *va, void *val, int size) {
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
-       pthread_mutex_lock(&lock);
+       pthread_mutex_lock(&lock_pmem);
        if(c==(pages-1)){
 
             memcpy(pa,(void*)addr,size%PGSIZE);
@@ -453,7 +486,7 @@ void put_value(void *va, void *val, int size) {
             memcpy(pa,(void*)addr,PGSIZE);
 
        }
-       pthread_mutex_unlock(&lock);
+       pthread_mutex_unlock(&lock_pmem);
 
    }
 
@@ -475,7 +508,7 @@ void get_value(void *va, void *val, int size) {
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
-       pthread_mutex_lock(&lock);
+       pthread_mutex_lock(&lock_pmem);
        if(c==(pages-1)){
 
             memcpy((void*)addr,pa,size%PGSIZE);
@@ -485,7 +518,7 @@ void get_value(void *va, void *val, int size) {
             memcpy((void*)addr,pa,PGSIZE);
 
        }
-       pthread_mutex_unlock(&lock);
+       pthread_mutex_unlock(&lock_pmem);
 
    }
 
