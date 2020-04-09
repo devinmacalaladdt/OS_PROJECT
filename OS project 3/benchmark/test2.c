@@ -18,7 +18,7 @@ printf("%u\n", ((unsigned) a));
     printf("c\n");
     get_value(a,(void*)&y,sizeof(int));
     printf("d\n");
-    printf("%d\n",y);
+    printf("s:%d, e:%d\n",x,y);
     a_free(a,sizeof(int));
     printf("e\n");
 
@@ -27,11 +27,12 @@ printf("%u\n", ((unsigned) a));
 int main(){
 
     pthread_t threads[10];
+    int * num = malloc(sizeof(int)*10);
     int c = 0;
     for(c=0;c<10;c++){
-	void * num = malloc(sizeof(int));
-	*((int*)num) = c;
-        pthread_create(&(threads[c]), NULL, print_thread, num); 
+
+	    num[c]=c;
+        pthread_create(&(threads[c]), NULL, print_thread, num+c); 
 
     }
 

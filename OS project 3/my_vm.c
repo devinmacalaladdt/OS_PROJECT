@@ -9,12 +9,8 @@ bool initialized = false;//global boolean, set to true after first a_malloc call
 int pgbits;
 int ptbits;
 int pdbits;
-pthread_mutex_t lock_pbmap;
-pthread_mutex_t lock_vbmap;
-pthread_mutex_t lock_pmem;
-pthread_mutex_t lock_pd;
-pthread_mutex_t lock_tlb;
-pthread_mutex_t lock_init;
+pthread_mutex_t lock;
+
 
 /*TLB Miss Rate Globals*/
 unsigned tlbLookup = 0, tlbMiss = 0;
@@ -141,21 +137,6 @@ void set_physical_mem() {
 
         }
 
-        if (pthread_mutex_init(&lock_pbmap, NULL) != 0) {
-            printf("\n mutex init has failed\n");
-        }
-        if (pthread_mutex_init(&lock_vbmap, NULL) != 0) {
-            printf("\n mutex init has failed\n");
-        }
-        if (pthread_mutex_init(&lock_pmem, NULL) != 0) {
-            printf("\n mutex init has failed\n");
-        }
-        if (pthread_mutex_init(&lock_tlb, NULL) != 0) {
-            printf("\n mutex init has failed\n");
-        }
-        if (pthread_mutex_init(&lock_pd, NULL) != 0) {
-            printf("\n mutex init has failed\n");
-        }
 
 
     }
@@ -247,21 +228,21 @@ void *translate(void *va) {
 	* translation exists, then you can return physical address from the TLB.
 	*/
 
-    pthread_mutex_lock(&lock_tlb);
+ 
 	void * translation = check_TLB(va);
-    pthread_mutex_unlock(&lock_tlb);
+
 
 	if (translation != NULL)
 		return translation; //In TLB so just return straight away
 
-    pthread_mutex_lock(&lock_pd);
+
 	translation = ((page_directory[get_top_bits((unsigned)va)]).pagetable[get_mid_bits((unsigned)va)]).paddr;
-    pthread_mutex_unlock(&lock_pd);
+
 
 	//TLB CACHE
-    pthread_mutex_lock(&lock_tlb);
+
 	add_TLB(va, translation);
-    pthread_mutex_unlock(&lock_tlb);
+
 
     
 
@@ -286,7 +267,7 @@ int page_map(void *va, void *pa)
     
 	unsigned int num_of_pte = (unsigned int)(pow(2, ptbits));
 
-    pthread_mutex_lock(&lock_pd);
+
 
 	if (((page_directory[pd]).pagetable) == NULL) {
 
@@ -302,7 +283,7 @@ int page_map(void *va, void *pa)
 
 	((page_directory[pd]).pagetable)[pt].paddr = pa;
 
-    pthread_mutex_unlock(&lock_pd);
+
 
 
 	return 0;
@@ -359,13 +340,13 @@ void *a_malloc(unsigned int num_bytes) {
 
 	if (initialized==false){
 
-        if (pthread_mutex_init(&lock_init, NULL) != 0) {
+        if (pthread_mutex_init(&lock, NULL) != 0) {
             printf("\n mutex init has failed\n");
         }
-        pthread_mutex_lock(&lock_init);
+        pthread_mutex_lock(&lock);
         initialized=true;
         set_physical_mem();
-        pthread_mutex_unlock(&lock_init);
+        pthread_mutex_unlock(&lock);
 
     }
 		
@@ -376,17 +357,17 @@ void *a_malloc(unsigned int num_bytes) {
     * free pages are available, set the bitmaps and map a new page. Note, you will 
     * have to mark which physical pages are used. 
     */
-
+    pthread_mutex_lock(&lock);
 	//unsigned numPages = ceil(((double)num_bytes / PGSIZE));
 	unsigned numPages = (num_bytes / PGSIZE) + 1;
-	pthread_mutex_lock(&lock_vbmap);
+
 	void* va = get_next_avail(numPages, virtual_map, MAX_MEMSIZE);
-	pthread_mutex_unlock(&lock_vbmap);
+
 	if (va == NULL)
 		return NULL; // no space or no consecutive space for the request
-	pthread_mutex_lock(&lock_pbmap);
+
 	void* pa = get_next_avail(numPages, physical_map, MEMSIZE);
-	pthread_mutex_unlock(&lock_pbmap);
+
 	if (pa == NULL)
 		return NULL; //not enough physical space
 	pa = physical_mem + (unsigned long)pa;
@@ -398,6 +379,7 @@ void *a_malloc(unsigned int num_bytes) {
 		pa = (void*)((char*)pa + PGSIZE);
 	}
 	
+    pthread_mutex_unlock(&lock);
 	return firstPageVA;
 
 }
@@ -417,7 +399,7 @@ void a_free(void *va, int size) {
      */
 
 	//memset(physical_mem[(unsigned)translate(va)], 0, size);//clear contents
-
+    pthread_mutex_lock(&lock);
 	unsigned numPages = (size / PGSIZE) + 1;
 
 	void *pa = translate(va);
@@ -425,7 +407,7 @@ void a_free(void *va, int size) {
 	unsigned index = page / 8;
 	unsigned bit = page % 8;
 	unsigned x;
-	pthread_mutex_lock(&lock_pbmap);
+
 	for (x = 0; x < numPages; x++) {
 		if (((physical_map[index] >> bit) & 1) == 1) {
 			physical_map[index] &= ~(1 << bit);
@@ -434,13 +416,13 @@ void a_free(void *va, int size) {
 		bit = page % 8;
 		index = page / 8;
 	}
-	pthread_mutex_unlock(&lock_pbmap);
+
 
 	page = (unsigned)(va) / PGSIZE;
 	index = page / 8;
 	bit = page % 8;
 
-	pthread_mutex_lock(&lock_vbmap);
+
 	for (x = 0; x < numPages; x++) {
 		if (((virtual_map[index] >> bit) & 1) == 1) {
 			virtual_map[index] &= ~(1 << bit);
@@ -449,11 +431,10 @@ void a_free(void *va, int size) {
 		bit = page % 8;
 		index = page / 8;
 	}
-	pthread_mutex_unlock(&lock_vbmap);
 
-    pthread_mutex_lock(&lock_tlb);
+
 	remove_TLB(va);
-    pthread_mutex_unlock(&lock_tlb);
+    pthread_mutex_unlock(&lock);
     
 }
 
@@ -471,12 +452,13 @@ void put_value(void *va, void *val, int size) {
 
    int pages = (int)(ceil((double)size/PGSIZE));
    int c=0;
+   pthread_mutex_lock(&lock);
    for(c=0;c<pages;c++){
 
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
-       pthread_mutex_lock(&lock_pmem);
+
        if(c==(pages-1)){
 
             memcpy(pa,(void*)addr,size%PGSIZE);
@@ -486,10 +468,11 @@ void put_value(void *va, void *val, int size) {
             memcpy(pa,(void*)addr,PGSIZE);
 
        }
-       pthread_mutex_unlock(&lock_pmem);
+
 
    }
 
+    pthread_mutex_unlock(&lock);
 
 }
 
@@ -503,12 +486,13 @@ void get_value(void *va, void *val, int size) {
 
    int pages = (int)(ceil((double)size/PGSIZE));
    int c=0;
+   pthread_mutex_lock(&lock);
    for(c=0;c<pages;c++){
 
        unsigned int addr = (unsigned int)va + (c*PGSIZE);
        void * pa = translate((void*)addr);
        addr = (unsigned int)val + (c*PGSIZE);
-       pthread_mutex_lock(&lock_pmem);
+
        if(c==(pages-1)){
 
             memcpy((void*)addr,pa,size%PGSIZE);
@@ -518,11 +502,11 @@ void get_value(void *va, void *val, int size) {
             memcpy((void*)addr,pa,PGSIZE);
 
        }
-       pthread_mutex_unlock(&lock_pmem);
+      
 
    }
 
-
+    pthread_mutex_unlock(&lock);
 
 }
 
