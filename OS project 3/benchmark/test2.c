@@ -10,6 +10,7 @@ void print_thread(void* start){
 
     printf("a\n");
     void * a = a_malloc(sizeof(int));
+printf("%u\n", ((unsigned) a));
     printf("b\n");
     int x = *((int*)start);
     int y = 0;
@@ -27,9 +28,10 @@ int main(){
 
     pthread_t threads[10];
     int c = 0;
-    for(c=0;c<50;c++){
-
-        pthread_create(&(threads[c]), NULL, print_thread, &c); 
+    for(c=0;c<10;c++){
+	void * num = malloc(sizeof(int));
+	*((int*)num) = c;
+        pthread_create(&(threads[c]), NULL, print_thread, num); 
 
     }
 
