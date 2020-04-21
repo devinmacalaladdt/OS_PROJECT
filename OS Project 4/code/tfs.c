@@ -167,8 +167,8 @@ int tfs_mkfs() {
 	set_bitmap(i_bmap,0);
 	set_bitmap(d_bmap,0);
 
-	bio_write(1,&i_bmap);
-	bio_write(2,&d_bmap);
+	bio_write(super_block->i_bitmap_blk,&i_bmap);
+	bio_write(super_block->d_bitmap_blk,&d_bmap);
 
 	// update inode for root directory
 	inode root;
@@ -194,15 +194,15 @@ int tfs_mkfs() {
 		root.direct_ptr[i]=-1;
 
 	}
-	root.direct_ptr[0] = 3+MAX_INUM/(BLOCK_SIZE/(sizeof(inode)));
-	bio_write(3,&root);
+	root.direct_ptr[0] = super_block->d_start_blk;
+	bio_write(i_start_blk,&root);
 
 	dirent d;
 	d.ino = 0;
 	d.valid = 1;
 	d.name = "/";
 	d.len = 1;
-	bio_write(3+MAX_INUM/(BLOCK_SIZE/(sizeof(inode))),&d);
+	bio_write(d_start_blk,&d);
 
 	return 0;
 }
