@@ -218,6 +218,7 @@ static void *tfs_init(struct fuse_conn_info *conn) {
 
   // Step 1b: If disk file is found, just initialize in-memory data structures
   // and read superblock from disk
+  	super_block = (super_block*)(malloc(sizeof(superblock)));
 	bio_read(0,&super_block);
 
 	return NULL;
