@@ -155,13 +155,13 @@ int tfs_mkfs() {
 	bio_write(0,super_block);
 
 	// initialize inode bitmap
-	char i_bmap[MAX_INUM];
-	memset(&i_bmap,0,MAX_INUM);
+	char i_bmap[MAX_INUM/8];
+	memset(&i_bmap,0,MAX_INUM/8);
 
 
 	// initialize data block bitmap
-	char d_bmap[MAX_DNUM];
-	memset(&d_bmap,0,MAX_DNUM);
+	char d_bmap[MAX_DNUM/8];
+	memset(&d_bmap,0,MAX_DNUM/8);
 
 	// update bitmap information for root directory
 	set_bitmap(i_bmap,0);
