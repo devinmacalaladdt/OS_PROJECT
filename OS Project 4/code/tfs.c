@@ -175,8 +175,8 @@ int tfs_mkfs() {
 	root.ino=0;
 	root.vstat.st_ino=0;
 	root.valid=1;
-	root.size = sizeof(dirent);
-	root.vstat.st_size = sizeof(dirent);
+	root.size = 0;
+	root.vstat.st_size = 0;
 	root.type = S_IFDIR;
 	root.vstat.st_mode = S_IFDIR;
 	root.link=0;
@@ -187,7 +187,7 @@ int tfs_mkfs() {
 	root.vstat.st_ctime.tv_sec = time(NULL);
 	root.vstat.st_mtime.tv_sec = time(NULL);
 
-	
+
 	int i = 0;
 	for(i=0;i<16;i++){
 
