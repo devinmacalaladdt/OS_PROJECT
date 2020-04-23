@@ -165,7 +165,6 @@ int tfs_mkfs() {
 
 	// update bitmap information for root directory
 	set_bitmap(i_bmap,0);
-	set_bitmap(d_bmap,0);
 
 	bio_write(super_block->i_bitmap_blk,&i_bmap);
 	bio_write(super_block->d_bitmap_blk,&d_bmap);
