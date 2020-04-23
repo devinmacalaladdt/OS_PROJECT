@@ -25,6 +25,7 @@
 char diskfile_path[PATH_MAX];
 
 // Declare your in-memory data structures here
+superblock * super_block;
 
 /* 
  * Get available inode number from bitmap
@@ -140,16 +141,59 @@ int get_node_by_path(const char *path, uint16_t ino, struct inode *inode) {
 int tfs_mkfs() {
 
 	// Call dev_init() to initialize (Create) Diskfile
+	dev_init("a.txt");
 
 	// write superblock information
+	super_block = (superblock*)(malloc(sizeof(superblock)));
+	super_block->magic_num = MAGIC_NUM;
+	super_block->max_inum = MAX_INUM;
+	super_block->max_dnum = MAX_DNUM;
+	super_block->i_bitmap_blk = 1;
+	super_block->d_bitmap_blk = 2;
+	super_block->i_start_blk = 3;
+	super_block->d_start_blk = 3+MAX_INUM/(BLOCK_SIZE/(sizeof(inode)));
+	bio_write(0,super_block);
 
 	// initialize inode bitmap
+	char i_bmap[MAX_INUM/8];
+	memset(&i_bmap,0,MAX_INUM/8);
+
 
 	// initialize data block bitmap
+	char d_bmap[MAX_DNUM/8];
+	memset(&d_bmap,0,MAX_DNUM/8);
 
 	// update bitmap information for root directory
+	set_bitmap(i_bmap,0);
+
+	bio_write(super_block->i_bitmap_blk,&i_bmap);
+	bio_write(super_block->d_bitmap_blk,&d_bmap);
 
 	// update inode for root directory
+	inode root;
+	root.ino=0;
+	root.vstat.st_ino=0;
+	root.valid=1;
+	root.size = 0;
+	root.vstat.st_size = 0;
+	root.type = S_IFDIR;
+	root.vstat.st_mode = S_IFDIR;
+	root.link=0;
+	root.vstat.st_nlink = 0;
+	root.vstat.st_blksize = BLOCK_SIZE;
+	root.vstat.blocks = 0;
+	root.vstat.st_atime.tv_sec = time(NULL);
+	root.vstat.st_ctime.tv_sec = time(NULL);
+	root.vstat.st_mtime.tv_sec = time(NULL);
+
+
+	int i = 0;
+	for(i=0;i<16;i++){
+
+		root.direct_ptr[i]=-1;
+
+	}
+	bio_write(i_start_blk,&root);
 
 	return 0;
 }
@@ -161,9 +205,12 @@ int tfs_mkfs() {
 static void *tfs_init(struct fuse_conn_info *conn) {
 
 	// Step 1a: If disk file is not found, call mkfs
+	if(dev_open("a.txt")==-1){tfs_mkfs(); return NULL;}
 
   // Step 1b: If disk file is found, just initialize in-memory data structures
   // and read superblock from disk
+  	super_block = (super_block*)(malloc(sizeof(superblock)));
+	bio_read(0,&super_block);
 
 	return NULL;
 }
@@ -171,8 +218,10 @@ static void *tfs_init(struct fuse_conn_info *conn) {
 static void tfs_destroy(void *userdata) {
 
 	// Step 1: De-allocate in-memory data structures
+	free(super_block);
 
 	// Step 2: Close diskfile
+	dev_close();
 
 }
 
