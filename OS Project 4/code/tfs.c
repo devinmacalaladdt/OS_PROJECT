@@ -181,7 +181,7 @@ int tfs_mkfs() {
 	root.link=0;
 	root.vstat.st_nlink = 0;
 	root.vstat.st_blksize = BLOCK_SIZE;
-	root.vstat.blocks = 1;
+	root.vstat.blocks = 0;
 	root.vstat.st_atime.tv_sec = time(NULL);
 	root.vstat.st_ctime.tv_sec = time(NULL);
 	root.vstat.st_mtime.tv_sec = time(NULL);
