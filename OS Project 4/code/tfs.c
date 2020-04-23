@@ -194,15 +194,7 @@ int tfs_mkfs() {
 		root.direct_ptr[i]=-1;
 
 	}
-	root.direct_ptr[0] = super_block->d_start_blk;
 	bio_write(i_start_blk,&root);
-
-	dirent d;
-	d.ino = 0;
-	d.valid = 1;
-	d.name = "/";
-	d.len = 1;
-	bio_write(d_start_blk,&d);
 
 	return 0;
 }
