@@ -58,24 +58,44 @@ int get_avail_blkno() {
 /* 
  * inode operations
  */
-int readi(uint16_t ino, inode *inode) {
+int readi(uint16_t ino, inode *_inode) {
+
+
+  	unsigned char buf[BLOCK_SIZE];
 
   // Step 1: Get the inode's on-disk block number
 
+  	uint16_t blk_num = ino/(BLOCK_SIZE/sizeof(inode));
+
   // Step 2: Get offset of the inode in the inode on-disk block
 
+  	uint16_t inner_ino = ino%(BLOCK_SIZE/sizeof(inode));
+
   // Step 3: Read the block from disk and then copy into inode structure
+
+	bio_read(super_block->i_start_blk+blk_num,buf);
+	memcpy(_inode, buf+(inner_ino*sizeof(inode)),sizeof(inode));
 
 	return 0;
 }
 
-int writei(uint16_t ino, inode *inode) {
+int writei(uint16_t ino, inode *_inode) {
+
+	unsigned char buf[BLOCK_SIZE];
 
 	// Step 1: Get the block number where this inode resides on disk
+
+	uint16_t blk_num = ino/(BLOCK_SIZE/sizeof(inode));
 	
 	// Step 2: Get the offset in the block where this inode resides on disk
 
+	uint16_t inner_ino = ino%(BLOCK_SIZE/sizeof(inode));
+
 	// Step 3: Write inode to disk 
+
+	bio_read(super_block->i_start_blk+blk_num,buf);
+	memcpy(buf+(inner_ino*sizeof(inode)), _inode,sizeof(inode));
+	bio_write(super_block->i_start_blk+blk_num,buf);
 
 	return 0;
 }
@@ -84,7 +104,7 @@ int writei(uint16_t ino, inode *inode) {
 /* 
  * directory operations
  */
-int dir_find(uint16_t ino, const char *fname, size_t name_len, struct dirent *dirent) {
+int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) {
 
   // Step 1: Call readi() to get the inode using ino (inode number of current directory)
 
@@ -143,11 +163,7 @@ int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 
 	}
 
-	unsigned char buf[BLOCK_SIZE];
-	uint16_t blk_num = ino/(BLOCK_SIZE/sizeof(inode));
-	uint16_t inner_ino = ino%(BLOCK_SIZE/sizeof(inode));
-	bio_read(super_block->i_start_blk+blk_num,buf);
-	memcpy(_inode, buf+(inner_ino*sizeof(inode)),sizeof(inode));
+	readi(ino,_inode);
 
 
 	// Note: You could either implement it in a iterative way or recursive way
@@ -172,6 +188,9 @@ int tfs_mkfs() {
 	super_block->d_bitmap_blk = 2;
 	super_block->i_start_blk = 3;
 	super_block->d_start_blk = 3+MAX_INUM/(BLOCK_SIZE/(sizeof(inode)));
+
+	unsigned char buf[BLOCK_SIZE];
+	memcpy(buf,super_block,sizeof(superblock));
 	bio_write(0,super_block);
 
 	// initialize inode bitmap
@@ -236,7 +255,9 @@ static void *tfs_init(struct fuse_conn_info *conn) {
   // Step 1b: If disk file is found, just initialize in-memory data structures
   // and read superblock from disk
   	super_block = (super_block*)(malloc(sizeof(superblock)));
-	bio_read(0,&super_block);
+	unsigned char buf[BLOCK_SIZE];
+	bio_read(0,buf);
+	memcpy(super_block,buf,sizeof(superblock));
 
 	return NULL;
 }
