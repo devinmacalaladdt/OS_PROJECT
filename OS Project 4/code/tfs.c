@@ -58,7 +58,7 @@ int get_avail_blkno() {
 /* 
  * inode operations
  */
-int readi(uint16_t ino, struct inode *inode) {
+int readi(uint16_t ino, inode *inode) {
 
   // Step 1: Get the inode's on-disk block number
 
@@ -69,7 +69,7 @@ int readi(uint16_t ino, struct inode *inode) {
 	return 0;
 }
 
-int writei(uint16_t ino, struct inode *inode) {
+int writei(uint16_t ino, inode *inode) {
 
 	// Step 1: Get the block number where this inode resides on disk
 	
@@ -96,7 +96,7 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, struct dirent *di
 	return 0;
 }
 
-int dir_add(struct inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len) {
+int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len) {
 
 	// Step 1: Read dir_inode's data block and check each directory entry of dir_inode
 	
@@ -113,7 +113,7 @@ int dir_add(struct inode dir_inode, uint16_t f_ino, const char *fname, size_t na
 	return 0;
 }
 
-int dir_remove(struct inode dir_inode, const char *fname, size_t name_len) {
+int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
 
 	// Step 1: Read dir_inode's data block and checks each directory entry of dir_inode
 	
@@ -127,9 +127,29 @@ int dir_remove(struct inode dir_inode, const char *fname, size_t name_len) {
 /* 
  * namei operation
  */
-int get_node_by_path(const char *path, uint16_t ino, struct inode *inode) {
+int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 	
 	// Step 1: Resolve the path name, walk through path, and finally, find its inode.
+	char p[208];
+	strcpy(p,path);
+	char * tok = strtok(p,"/");
+	dirent d;
+
+	while(tok!=NULL){
+
+		int res = dir_find(ino,tok,strlen(tok),&d);
+		if(res!=0){printf("Invalid Path\n");return -1;}
+		ino = d.ino;
+
+	}
+
+	char buf[BLOCK_SIZE];
+	uint16_t blk_num = ino/(BLOCK_SIZE/sizeof(inode));
+	uint16_t inner_ino = ino%(BLOCK_SIZE/sizeof(inode));
+	bio_read(super_block->i_start_blk+blk_num,buf,buf);
+	memcpy(_inode, buf+(inner_ino*sizeof(inode)),sizeof(inode));
+
+
 	// Note: You could either implement it in a iterative way or recursive way
 
 	return 0;
@@ -155,19 +175,21 @@ int tfs_mkfs() {
 	bio_write(0,super_block);
 
 	// initialize inode bitmap
-	char i_bmap[MAX_INUM/8];
-	memset(&i_bmap,0,MAX_INUM/8);
+	unsigned char buf1[BLOCK_SIZE];
+	memset(buf1,0,BLOCK_SIZE);
+	
 
 
 	// initialize data block bitmap
-	char d_bmap[MAX_DNUM/8];
-	memset(&d_bmap,0,MAX_DNUM/8);
+	unsigned char buf2[BLOCK_SIZE];
+	memset(buf2,0,BLOCK_SIZE);
 
 	// update bitmap information for root directory
-	set_bitmap(i_bmap,0);
+	set_bitmap(buf1,0);
 
-	bio_write(super_block->i_bitmap_blk,&i_bmap);
-	bio_write(super_block->d_bitmap_blk,&d_bmap);
+
+	bio_write(super_block->i_bitmap_blk,&buf1);
+	bio_write(super_block->d_bitmap_blk,&buf2);
 
 	// update inode for root directory
 	inode root;
@@ -193,7 +215,11 @@ int tfs_mkfs() {
 		root.direct_ptr[i]=-1;
 
 	}
-	bio_write(i_start_blk,&root);
+
+	memset(buf1,0,BLOCK_SIZE);
+	memcpy(buf1,&root,sizeof(inode));
+
+	bio_write(i_start_blk,&buf1);
 
 	return 0;
 }
