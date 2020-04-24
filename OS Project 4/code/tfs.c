@@ -143,10 +143,10 @@ int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 
 	}
 
-	char buf[BLOCK_SIZE];
+	unsigned char buf[BLOCK_SIZE];
 	uint16_t blk_num = ino/(BLOCK_SIZE/sizeof(inode));
 	uint16_t inner_ino = ino%(BLOCK_SIZE/sizeof(inode));
-	bio_read(super_block->i_start_blk+blk_num,buf,buf);
+	bio_read(super_block->i_start_blk+blk_num,buf);
 	memcpy(_inode, buf+(inner_ino*sizeof(inode)),sizeof(inode));
 
 
@@ -188,8 +188,8 @@ int tfs_mkfs() {
 	set_bitmap(buf1,0);
 
 
-	bio_write(super_block->i_bitmap_blk,&buf1);
-	bio_write(super_block->d_bitmap_blk,&buf2);
+	bio_write(super_block->i_bitmap_blk,buf1);
+	bio_write(super_block->d_bitmap_blk,buf2);
 
 	// update inode for root directory
 	inode root;
@@ -219,7 +219,7 @@ int tfs_mkfs() {
 	memset(buf1,0,BLOCK_SIZE);
 	memcpy(buf1,&root,sizeof(inode));
 
-	bio_write(super_block->i_start_blk,&buf1);
+	bio_write(super_block->i_start_blk,buf1);
 
 	return 0;
 }
