@@ -219,7 +219,7 @@ int tfs_mkfs() {
 	memset(buf1,0,BLOCK_SIZE);
 	memcpy(buf1,&root,sizeof(inode));
 
-	bio_write(i_start_blk,&buf1);
+	bio_write(super_block->i_start_blk,&buf1);
 
 	return 0;
 }
