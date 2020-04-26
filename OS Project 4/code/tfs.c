@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <math.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <libgen.h>
@@ -108,7 +109,39 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 
   // Step 1: Call readi() to get the inode using ino (inode number of current directory)
 
+	inode i;
+	readi(ino,&i);
+	int num_dirents = i.size/(sizeof(dirent));
+
   // Step 2: Get data block of current directory from inode
+
+	int b = 0;//current block index in direct_ptr
+	int d = 0;//current total dirent within enitre directory
+
+	for(b=0;b<16;b++){
+
+		if(i.direct_ptr[b]==0){continue;}
+		unsigned char buf[BLOCK_SIZE];
+		bio_read(i.direct_ptr[b],buf);
+		int curr_dirent = 0;//current dirent within block
+		while(curr_dirent<(BLOCK_SIZE/sizeof(dirent)) && d<num_dirents){
+
+			dirent dir;
+			memcpy(&dir,buf+curr_dirent*(sizeof(dirent)),sizeof(dirent));
+			if(strcmp(dir.name,fname)==0){
+
+				memcpy(_dirent,&dir,sizeof(dirent));
+				return 0;
+
+			}
+			curr_dirent++;
+			d++;
+
+		}
+
+	}
+
+	return -1;
 
   // Step 3: Read directory's data block and check each directory entry.
   //If the name matches, then copy directory entry to dirent structure
@@ -231,7 +264,7 @@ int tfs_mkfs() {
 	int i = 0;
 	for(i=0;i<16;i++){
 
-		root.direct_ptr[i]=-1;
+		root.direct_ptr[i]=0;
 
 	}
 
