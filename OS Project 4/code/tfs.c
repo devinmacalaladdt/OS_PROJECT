@@ -26,34 +26,60 @@
 char diskfile_path[PATH_MAX];
 
 // Declare your in-memory data structures here
-superblock * super_block;
+superblock * super_block = NULL;
 
-/* 
+/*
  * Get available inode number from bitmap
  */
 int get_avail_ino() {
-
+	return get_avail(1);
 	// Step 1: Read inode bitmap from disk
-	
+
 	// Step 2: Traverse inode bitmap to find an available slot
 
 	// Step 3: Update inode bitmap and write to disk 
 
-	return 0;
 }
 
 /* 
  * Get available data block number from bitmap
  */
 int get_avail_blkno() {
-
+	return get_avail(0);
 	// Step 1: Read data block bitmap from disk
 	
 	// Step 2: Traverse data block bitmap to find an available slot
 
 	// Step 3: Update data block bitmap and write to disk 
 
-	return 0;
+}
+
+int get_avail(int bitmap_type) {
+	if (super_block == NULL)
+		return -1;
+	if(bitmap_type)
+		uint32_t block = super_block->i_bitmap_blk;
+	else
+		uint32_t block = super_block->d_bitmap_blk;
+	unsigned char bitmap[BLOCK_SIZE];
+	int chk = bio_read(block, bitmap);
+	if (chk < 0)
+		return -1;
+	int x, y;
+	for (x = 0; x < BLOCK_SIZE; x++) {
+		if (bitmap[x] == 0b11111111)
+			continue;
+		for (y = 0; y < 8; y++) {
+			if (!((bitmap[x] >> y) & 1)) {
+				bitmap[x] &= !((bitmap[x] >> y) & 1);
+				chk = bio_write(block, bitmap);
+				if (chk < 0)
+					return -1;
+				return (x * 8 + y);
+			}
+		}
+	}
+	return -1;
 }
 
 /* 
@@ -145,14 +171,58 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 
   // Step 3: Read directory's data block and check each directory entry.
   //If the name matches, then copy directory entry to dirent structure
-
-	return 0;
 }
 
 int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len) {
-
+	if (name_len > 207)
+		return -1;
 	// Step 1: Read dir_inode's data block and check each directory entry of dir_inode
-	
+	unsigned char block[BLOCK_SIZE];
+	int x, y;
+	for (x = 0; x < 16; x++) {
+		if (dir_inode.direct_ptr[x] < 1) continue;
+		int chk = bio_read(dir_inode.direct_ptr[x], block);
+		if(!(chk < 0))
+			for (y = 0; y < BLOCK_SIZE / sizeof(dirent); y++) { //16
+				dirent *dir = (dirent*)malloc(sizeof(dirent));
+				memcpy(dir, (block + x * sizeof(dirent)), sizeof(dirent));
+				if (strcmp(dir->name, fname) == 0 && dir->valid == 1) {
+					free(dir);
+					return -1; //already exists
+				}
+				free(dir);
+			}
+	}
+
+	for (x = 0; x < 16; x++) {
+		if (dir_inode.direct_ptr[x] < 1) {
+			dir_inode.direct_ptr[x] = get_avail_blkno(); //new block
+		}
+		int chk = bio_read(dir_inode.direct_ptr[x], block);
+		if (!(chk < 0))
+			for (y = 0; y < BLOCK_SIZE / sizeof(dirent); y++) { //16
+				dirent *dir = (dirent*)malloc(sizeof(dirent));
+				memcpy(dir, (block + x * sizeof(dirent)), sizeof(dirent));
+				if (dir->valid == 0) { //invalid Or unused
+					memcpy(dir->name, fname, name_len);
+					dir->valid = 1;
+					dir->ino = f_ino;
+					dir->len = name_len;
+					memcpy((block + x * sizeof(dirent)), dir, sizeof(dirent));
+					chk = bio_write(dir_inode.direct_ptr[x], block);
+					//add inode block
+					/*inode *i = (inode*)malloc(sizeof(inode));
+					readi(f_ino, i);
+					if (i->direct_ptr[0] == 0)
+						i->direct_ptr[0] = get_avail_blkno();
+					writei(f_ino, i);*/
+					free(dir);
+					//free(i);
+					if (chk < 0) return -1;
+					return 1;
+				}
+			}
+	}
 	// Step 2: Check if fname (directory name) is already used in other entries
 
 	// Step 3: Add directory entry in dir_inode's data block and write to disk
@@ -163,18 +233,47 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 
 	// Write directory entry
 
-	return 0;
+	return -1;
 }
 
 int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
-
+	if (name_len > 207)
+		return -1;
+	unsigned char block[BLOCK_SIZE];
+	int x, y;
+	for (x = 0; x < 16; x++) {
+		if (dir_inode.direct_ptr[x] < 1) continue;
+		int chk = bio_read(dir_inode.direct_ptr[x], block);
+		if (!(chk < 0))
+			for (y = 0; y < BLOCK_SIZE / sizeof(dirent); y++) { //16
+				dirent *dir = (dirent*)malloc(sizeof(dirent));
+				memcpy(dir, (block + x * sizeof(dirent)), sizeof(dirent));
+				if (strcmp(dir->name, fname) == 0 && dir->valid == 1) {
+					inode *i = (inode*)malloc(sizeof(inode));
+					readi(dir->ino, i);
+					int z;
+					for (z = 0; z < 16; z++)
+						if (i->direct_ptr[z] != 0)
+							return -2; //cannot delete dir with files in it
+					dir->valid = 0;
+					memcpy((block + x * sizeof(dirent)), dir, sizeof(dirent));
+					chk = bio_write(dir_inode.direct_ptr[x], block);
+					free(dir);
+					free(i);
+					if (chk < 0)
+						return -1;
+					return 1;
+				}
+				free(dir);
+			}
+	}
 	// Step 1: Read dir_inode's data block and checks each directory entry of dir_inode
 	
 	// Step 2: Check if fname exist
 
 	// Step 3: If exist, then remove it from dir_inode's data block and write to disk
 
-	return 0;
+	return -1;
 }
 
 /* 
