@@ -480,6 +480,8 @@ static int tfs_releasedir(const char *path, struct fuse_file_info *fi) {
 static int tfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
 
 	// Step 1: Use dirname() and basename() to separate parent directory path and target file name
+	char * dirPath = dirname(path); 
+	char * fileName = basename(path);
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
 
@@ -569,6 +571,25 @@ static int tfs_utimens(const char *path, const struct timespec tv[2]) {
     return 0;
 }
 
+char* dirname(char* path) {
+	int x;
+	for (x = strlen(path); x > 0; x++) {
+		if (*(path + x - 1) == '/')
+			*(path + x - 1) = '\0';
+	}
+	if (x == 0) return -1;
+	return path;
+}
+
+char* basename(char* path) {
+	int x;
+	for (x = strlen(path); x > 0; x++) {
+		if (*(path + x - 1) == '/')
+			*(path + x - 1) = '\0';
+	}
+	if (x == 0) return -1;
+	return (path + x);
+}
 
 static struct fuse_operations tfs_ope = {
 	.init		= tfs_init,
