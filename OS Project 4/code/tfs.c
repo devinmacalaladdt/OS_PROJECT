@@ -355,9 +355,11 @@ int tfs_mkfs() {
 	root.vstat.st_nlink = 0;
 	root.vstat.st_blksize = BLOCK_SIZE;
 	root.vstat.blocks = 0;
-	root.vstat.st_atime.tv_sec = time(NULL);
-	root.vstat.st_ctime.tv_sec = time(NULL);
-	root.vstat.st_mtime.tv_sec = time(NULL);
+	root.vstat.st_gid = getgid();
+	root.vstat.st_uid = getuid();
+	time(&root.vstat.st_atime);
+	time(&root.vstat.st_ctime);
+	time(&root.vstat.st_mtime);
 
 
 	int i = 0;
@@ -408,11 +410,23 @@ static int tfs_getattr(const char *path, struct stat *stbuf) {
 
 	// Step 1: call get_node_by_path() to get inode from path
 
+	inode i;
+	int res = get_node_by_path(path,0,&i);
+	if(res==-1){return -1;}
+
 	// Step 2: fill attribute of file into stbuf from inode
 
-		stbuf->st_mode   = S_IFDIR | 0755;
-		stbuf->st_nlink  = 2;
-		time(&stbuf->st_mtime);
+	stbuf->st_ino = i.vstat.st_ino;
+	stbuf->st_size = i.vstat.st_size;
+	stbuf->st_mode = i.vstat.st_mode;
+	stbuf->st_nlink = i.vstat.st_nlink;
+	stbuf->st_blksize = i.vstat.st_blksize;
+	stbuf->st_blocks = i.vstat.blocks;
+	stbuf->st_gid = getgid();
+	stbuf->st_uid = getuid();
+	time(&stbuf->st_atime);
+	time(&stbuf->st_mtime);
+	time(&stbuf->st_ctime);
 
 	return 0;
 }
@@ -420,7 +434,10 @@ static int tfs_getattr(const char *path, struct stat *stbuf) {
 static int tfs_opendir(const char *path, struct fuse_file_info *fi) {
 
 	// Step 1: Call get_node_by_path() to get inode from path
-
+	inode i;
+	int res = get_node_by_path(path,0,&i);
+	if(res==-1){return -1;}
+	if(i.type!=S_IFDIR){return -1;}
 	// Step 2: If not find, return -1
 
     return 0;
