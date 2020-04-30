@@ -154,14 +154,19 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 
 			dirent dir;
 			memcpy(&dir,buf+curr_dirent*(sizeof(dirent)),sizeof(dirent));
-			if(strcmp(dir.name,fname)==0){
+			if(dir.valid==1){
 
-				memcpy(_dirent,&dir,sizeof(dirent));
-				return 0;
+				if(strcmp(dir.name,fname)==0){
+					
+					memcpy(_dirent,&dir,sizeof(dirent));
+					return 0;
+
+				}
+
+				d++;
 
 			}
 			curr_dirent++;
-			d++;
 
 		}
 
@@ -282,6 +287,12 @@ int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
 int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 	
 	// Step 1: Resolve the path name, walk through path, and finally, find its inode.
+	if(strcmp(path,"")=="/"){
+
+		readi(0,_inode);
+		return 0;
+
+	}
 	char p[208];
 	strcpy(p,path);
 	char * tok = strtok(p,"/");
@@ -337,6 +348,7 @@ int tfs_mkfs() {
 
 	// update bitmap information for root directory
 	set_bitmap(buf1,0);
+	set_bitmap(buf2,0);
 
 
 	bio_write(super_block->i_bitmap_blk,buf1);
@@ -368,6 +380,19 @@ int tfs_mkfs() {
 		root.direct_ptr[i]=0;
 
 	}
+
+	root.direct_ptr[0]=super_block->d_start_blk;
+	unsigned char buf3[BLOCK_SIZE];
+	int c = 0;
+	for(c=0;c<(BLOCK_SIZE/sizeof(dirent));c++){
+
+		dirent d;
+		d.valid = 0;
+		memcpy(buf3+(c*sizeof(dirent)),&d,sizeof(dirent));
+
+	}
+
+	bio_write(super_block->d_start_blk,buf3);
 
 	memset(buf1,0,BLOCK_SIZE);
 	memcpy(buf1,&root,sizeof(inode));
@@ -446,8 +471,38 @@ static int tfs_opendir(const char *path, struct fuse_file_info *fi) {
 static int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
 
 	// Step 1: Call get_node_by_path() to get inode from path
+	inode i;
+	int res = get_node_by_path(path,0,&i);
+	if(res==-1){return -1;}
+	if(i.type!=S_IFDIR){return -1;}
 
 	// Step 2: Read directory entries from its data blocks, and copy them to filler
+	int b = 0;//current block index in direct_ptr
+	int d = 0;//current total dirent within enitre directory
+	int num_dirents = i.size/(sizeof(dirent));
+
+	for(b=0;b<16;b++){
+
+		if(i.direct_ptr[b]==0){continue;}
+		unsigned char buf[BLOCK_SIZE];
+		bio_read(i.direct_ptr[b],buf);
+		int curr_dirent = 0;//current dirent within block
+		while(curr_dirent<(BLOCK_SIZE/sizeof(dirent)) && d<num_dirents){
+
+			dirent dir;
+			memcpy(&dir,buf+curr_dirent*(sizeof(dirent)),sizeof(dirent));
+
+			if(dir.valid==1){
+
+				filler(buffer,dir.name,NULL,0);
+				d++;
+
+			}
+			curr_dirent++;
+
+		}
+
+	}
 
 	return 0;
 }
@@ -456,16 +511,67 @@ static int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, o
 static int tfs_mkdir(const char *path, mode_t mode) {
 
 	// Step 1: Use dirname() and basename() to separate parent directory path and target directory name
+	char * dirPath = dirname(path); 
+	char * fileName = basename(path);
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
+	inode parent;
+	int res = get_node_by_path(path,0,&parent);
+	if(res==-1){return -1;}
+	if(parent.type!=S_IFDIR){return -1;}
 
 	// Step 3: Call get_avail_ino() to get an available inode number
+	int next_avail = get_avail(1);
 
 	// Step 4: Call dir_add() to add directory entry of target directory to parent directory
+	res = dir_add(parent,next_avail,fileName,strlen(fileName));
+	if(res==-1){return -1;}
 
 	// Step 5: Update inode for target directory
+	inode i;
+	i.ino=next_avail;
+	i.vstat.st_ino=next_avail;
+	i.valid=1;
+	i.size = 0;
+	i.vstat.st_size = 0;
+	i.type = S_IFDIR;
+	i.vstat.st_mode = S_IFDIR;
+	i.link=1;
+	i.vstat.st_nlink = 1;
+	i.vstat.st_blksize = BLOCK_SIZE;
+	i.vstat.blocks = 0;
+	i.vstat.st_gid = getgid();
+	i.vstat.st_uid = getuid();
+	time(&i.vstat.st_atime);
+	time(&i.vstat.st_ctime);
+	time(&i.vstat.st_mtime);
+
+
+	int i = 0;
+	for(i=0;i<16;i++){
+
+		i.direct_ptr[i]=0;
+
+	}
+
+// allocate new block to hold dirents, set all to invalid initially
+	int dir_next_avail = get_avail(0);
+	i.direct_ptr[0]=super_block->d_start_blk+dir_next_avail;
+	unsigned char buf[BLOCK_SIZE];
+	int c = 0;
+	for(c=0;c<(BLOCK_SIZE/sizeof(dirent));c++){
+
+		dirent d;
+		d.valid = 0;
+		memcpy(buf+(c*sizeof(dirent)),&d,sizeof(dirent));
+
+	}
+
+	bio_write(super_block->d_start_blk+dir_next_avail,buf);
+	
 
 	// Step 6: Call writei() to write inode to disk
+	writei(next_avail,&i);
 	
 
 	return 0;
