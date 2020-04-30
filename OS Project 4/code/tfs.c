@@ -484,12 +484,17 @@ static int tfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
 	char * fileName = basename(path);
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
+	inode *pd = (inode*)malloc(sizeof(inode));
+	int ino = get_node_by_path(path, 0, pd);/*replace 0 with right input*/
 
 	// Step 3: Call get_avail_ino() to get an available inode number
-
+	int availino = get_avail_ino();
+	
 	// Step 4: Call dir_add() to add directory entry of target file to parent directory
+	dir_add(*pd, availino, fileName, strlen(fileName));
 
 	// Step 5: Update inode for target file
+	
 
 	// Step 6: Call writei() to write inode to disk
 
@@ -571,24 +576,29 @@ static int tfs_utimens(const char *path, const struct timespec tv[2]) {
     return 0;
 }
 
-char* dirname(char* path) {
+char* dirname(char* p) {
+	char* path = (char*)malloc(strlen(p) + 1);
+	strcpy(path, p);
 	int x;
-	for (x = strlen(path); x > 0; x++) {
-		if (*(path + x - 1) == '/')
+	for (x = strlen(path); x > 0; x--) {
+		if (*(path + x - 1) == '/') {
 			*(path + x - 1) = '\0';
+			return path;
+		}
 	}
-	if (x == 0) return -1;
-	return path;
+	return -1;
 }
 
-char* basename(char* path) {
+char* basename(char* p) {
+	char* path = (char*)malloc(strlen(p) + 1);
+	strcpy(path, p);
 	int x;
-	for (x = strlen(path); x > 0; x++) {
-		if (*(path + x - 1) == '/')
-			*(path + x - 1) = '\0';
+	for (x = strlen(path); x > 0; x--) {
+		if (*(path + x - 1) == '/') {
+			return (path + x);
+		}
 	}
-	if (x == 0) return -1;
-	return (path + x);
+	return -1;
 }
 
 static struct fuse_operations tfs_ope = {
