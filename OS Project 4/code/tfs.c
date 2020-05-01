@@ -199,9 +199,11 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 			}
 	}
 
+	/*precondition: validated that it doesn't already exist above*/
 	for (x = 0; x < 16; x++) {
 		if (dir_inode.direct_ptr[x] < 1) {
 			dir_inode.direct_ptr[x] = get_avail_blkno(); //new block
+			dir_inode.vstat.st_blksize++;
 		}
 		int chk = bio_read(dir_inode.direct_ptr[x], block);
 		if (!(chk < 0))
@@ -213,16 +215,15 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 					dir->valid = 1;
 					dir->ino = f_ino;
 					dir->len = name_len;
+					/*write new/updated dirent block to disk*/
 					memcpy((block + x * sizeof(dirent)), dir, sizeof(dirent));
 					chk = bio_write(dir_inode.direct_ptr[x], block);
-					//add inode block
-					/*inode *i = (inode*)malloc(sizeof(inode));
-					readi(f_ino, i);
-					if (i->direct_ptr[0] == 0)
-						i->direct_ptr[0] = get_avail_blkno();
-					writei(f_ino, i);*/
 					free(dir);
-					//free(i);
+					if (chk < 0) return -1;
+					/*write updated dir_inode*/
+					dir_inode.vstat.st_size += sizeof(dirent);
+					dir_inode.size += sizeof(dirent);
+					chk = writei(f_ino, &dir_inode);
 					if (chk < 0) return -1;
 					return 1;
 				}
@@ -265,8 +266,9 @@ int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
 					chk = bio_write(dir_inode.direct_ptr[x], block);
 					free(dir);
 					free(i);
-					if (chk < 0)
-						return -1;
+					if (chk < 0) return -1;
+					dir_inode.vstat.st_size -= sizeof(dirent);
+					dir_inode.size -= sizeof(dirent);
 					return 1;
 				}
 				free(dir);
