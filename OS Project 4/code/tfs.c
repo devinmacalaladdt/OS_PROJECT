@@ -223,7 +223,7 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 					/*write updated dir_inode*/
 					dir_inode.vstat.st_size += sizeof(dirent);
 					dir_inode.size += sizeof(dirent);
-					chk = writei(f_ino, &dir_inode);
+					chk = writei(dir_inode.ino, &dir_inode);
 					if (chk < 0) return -1;
 					return 1;
 				}
@@ -264,11 +264,11 @@ int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
 					dir->valid = 0;
 					memcpy((block + x * sizeof(dirent)), dir, sizeof(dirent));
 					chk = bio_write(dir_inode.direct_ptr[x], block);
-					free(dir);
 					free(i);
 					if (chk < 0) return -1;
 					dir_inode.vstat.st_size -= sizeof(dirent);
 					dir_inode.size -= sizeof(dirent);
+					writei(dir_inode.ino, &dir_inode);
 					return 1;
 				}
 				free(dir);
@@ -610,13 +610,14 @@ static int tfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
 	inode *pd = (inode*)malloc(sizeof(inode));
-	int ino = get_node_by_path(path, 0, pd);/*replace 0 with right input*/
+	int ino = get_node_by_path(dirPath, 0, pd);
 
 	// Step 3: Call get_avail_ino() to get an available inode number
 	int availino = get_avail_ino();
 	
 	// Step 4: Call dir_add() to add directory entry of target file to parent directory
-	dir_add(*pd, availino, fileName, strlen(fileName));
+	if (dir_add(*pd, availino, fileName, strlen(fileName)) < 0)
+		return -1;
 
 	// Step 5: Update inode for target file
 	
