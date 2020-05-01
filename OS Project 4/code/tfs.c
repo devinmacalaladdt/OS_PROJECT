@@ -391,17 +391,10 @@ int tfs_mkfs() {
 
 	}
 
+	//initial block for root
 	root.direct_ptr[0]=super_block->d_start_blk;
 	unsigned char buf3[BLOCK_SIZE];
-	int c = 0;
-	for(c=0;c<(BLOCK_SIZE/sizeof(dirent));c++){
-
-		dirent d;
-		d.valid = 0;
-		memcpy(buf3+(c*sizeof(dirent)),&d,sizeof(dirent));
-
-	}
-
+	memset(buf3,0,BLOCK_SIZE);
 	bio_write(super_block->d_start_blk,buf3);
 
 	memset(buf1,0,BLOCK_SIZE);
@@ -564,19 +557,11 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 
 	}
 
-// allocate new block to hold dirents, set all to invalid initially
-	int dir_next_avail = get_avail_blk();
+	//initial block for new directory
+	int dir_next_avail = get_avail_blkno();
 	i.direct_ptr[0]=dir_next_avail;
 	unsigned char buf[BLOCK_SIZE];
-	int c = 0;
-	for(c=0;c<(BLOCK_SIZE/sizeof(dirent));c++){
-
-		dirent d;
-		d.valid = 0;
-		memcpy(buf+(c*sizeof(dirent)),&d,sizeof(dirent));
-
-	}
-
+	memset(buf,0,BLOCK_SIZE);
 	bio_write(super_block->d_start_blk+dir_next_avail,buf);
 	
 
