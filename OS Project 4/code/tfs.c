@@ -520,7 +520,7 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
 	inode parent;
-	int res = get_node_by_path(path,0,&parent);
+	int res = get_node_by_path(dirPath,0,&parent);
 	if(res==-1){return -1;}
 	if(parent.type!=S_IFDIR){return -1;}
 
@@ -584,16 +584,47 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 static int tfs_rmdir(const char *path) {
 
 	// Step 1: Use dirname() and basename() to separate parent directory path and target directory name
+	char * dirPath = dirname(path); 
+	char * fileName = basename(path);
 
-	// Step 2: Call get_node_by_path() to get inode of target directory
+	// Step 2: Call get_node_by_path() to get inode of parent directory
+	inode parent;
+	int res = get_node_by_path(dirPath,0,&parent);
+	if(res==-1){return -1;}
+	if(parent.type!=S_IFDIR){return -1;}
 
 	// Step 3: Clear data block bitmap of target directory
+	inode child;
+	res = get_node_by_path(path,0,&child);
+	if(res==-1){return -1;}
+	if(child.type!=S_IFDIR){return -1;}
+
+	// unset data bitmap at locations taken by target directory
+	unsigned char buf[BLOCK_SIZE];
+	bio_read(super_block->d_bitmap_blk,buf);
+	int c = 0;
+	for(c=0;c<16;c++){
+
+		if(child.direct_ptr[c]!=0){
+
+			unset_bitmap(buf,child.direct_ptr[c]-super_block->d_bitmap_blk);
+
+		}
+
+	}
+	bio_write(super_block->d_bitmap_blk,buf);
 
 	// Step 4: Clear inode bitmap and its data block
+	bio_read(super_block->i_bitmap_blk,buf);
+	unset_bitmap(buf,child.ino);
+	bio_write(super_block->i_bitmap_blk,buf);
 
 	// Step 5: Call get_node_by_path() to get inode of parent directory
+	// this was step 2?
 
 	// Step 6: Call dir_remove() to remove directory entry of target directory in its parent directory
+	res = dir_remove(parent,fileName,strlen(fileName));
+	if(res==-1){return -1;}
 
 	return 0;
 }
