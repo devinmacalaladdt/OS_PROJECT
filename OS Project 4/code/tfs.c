@@ -75,7 +75,9 @@ int get_avail(int bitmap_type) {
 				chk = bio_write(block, bitmap);
 				if (chk < 0)
 					return -1;
-				return (x * 8 + y);
+				if(bitmap_type)
+					return (x * 8 + y) + super_block->i_bitmap_blk;
+				return (x * 8 + y) + super_block->d_bitmap_blk;
 			}
 		}
 	}
@@ -523,7 +525,7 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 	if(parent.type!=S_IFDIR){return -1;}
 
 	// Step 3: Call get_avail_ino() to get an available inode number
-	int next_avail = get_avail(1);
+	int next_avail = get_avail_ino();
 
 	// Step 4: Call dir_add() to add directory entry of target directory to parent directory
 	res = dir_add(parent,next_avail,fileName,strlen(fileName));
@@ -557,8 +559,8 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 	}
 
 // allocate new block to hold dirents, set all to invalid initially
-	int dir_next_avail = get_avail(0);
-	i.direct_ptr[0]=super_block->d_start_blk+dir_next_avail;
+	int dir_next_avail = get_avail_blk();
+	i.direct_ptr[0]=dir_next_avail;
 	unsigned char buf[BLOCK_SIZE];
 	int c = 0;
 	for(c=0;c<(BLOCK_SIZE/sizeof(dirent));c++){
@@ -620,9 +622,34 @@ static int tfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
 		return -1;
 
 	// Step 5: Update inode for target file
-	
+	inode *i = (inode*)malloc(sizeof(inode));
+	/*initialize inode*/
+	i->ino = availino;
+	i->valid = 1;
+	i->size = 0;
+	i->type = S_IFMT;
+	int x;
+	for (x = 0; x < 16; x++) {
+		if (x % 2 == 0)
+			i->indirect_ptr[x / 2] = 0;
+		i->direct_ptr[x] = 0;
+	}
+	i->vstat.st_ino = availino;
+	i->vstat.st_size = 0;
+	i->vstat.st_mode = S_IFMT;
+	i->link = 1;
+	i->vstat.st_nlink = 1;
+	i->vstat.st_blksize = BLOCK_SIZE;
+	i->vstat.blocks = 0;
+	i->vstat.st_gid = getgid();
+	i->vstat.st_uid = getuid();
+	time(&i->vstat.st_atime);
+	time(&i->vstat.st_ctime);
+	time(&i->vstat.st_mtime);
 
 	// Step 6: Call writei() to write inode to disk
+	int chk = writei(availino, i);
+	if (chk < 0) return -1;
 
 	return 0;
 }
