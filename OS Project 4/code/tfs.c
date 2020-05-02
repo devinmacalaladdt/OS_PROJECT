@@ -27,6 +27,9 @@ char diskfile_path[PATH_MAX];
 
 // Declare your in-memory data structures here
 superblock * super_block = NULL;
+int get_avail(int);
+//const char* dirname(const char*);
+//const char* basename(const char*);
 
 /*
  * Get available inode number from bitmap
@@ -59,10 +62,11 @@ int get_avail_blkno() {
 int get_avail(int bitmap_type) {
 	if (super_block == NULL)
 		return -1;
+	uint32_t block;
 	if(bitmap_type)
-		uint32_t block = super_block->i_bitmap_blk;
+		block = super_block->i_bitmap_blk;
 	else
-		uint32_t block = super_block->d_bitmap_blk;
+		block = super_block->d_bitmap_blk;
 	unsigned char bitmap[BLOCK_SIZE];
 	int chk = bio_read(block, bitmap);
 	if (chk < 0)
@@ -376,7 +380,7 @@ int tfs_mkfs() {
 	root.link=0;
 	root.vstat.st_nlink = 0;
 	root.vstat.st_blksize = BLOCK_SIZE;
-	root.vstat.blocks = 0;
+	root.vstat.st_blocks = 0;
 	root.vstat.st_gid = getgid();
 	root.vstat.st_uid = getuid();
 	time(&root.vstat.st_atime);
@@ -634,7 +638,7 @@ static int tfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
 	inode *pd = (inode*)malloc(sizeof(inode));
-	int ino = get_node_by_path(dirPath, 0, pd);
+	/*int ino = */get_node_by_path(dirPath, 0, pd);
 
 	// Step 3: Call get_avail_ino() to get an available inode number
 	int availino = get_avail_ino();
@@ -662,7 +666,7 @@ static int tfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
 	i->link = 1;
 	i->vstat.st_nlink = 1;
 	i->vstat.st_blksize = BLOCK_SIZE;
-	i->vstat.blocks = 0;
+	//i->vstat.blocks = 0;
 	i->vstat.st_gid = getgid();
 	i->vstat.st_uid = getuid();
 	time(&i->vstat.st_atime);
@@ -692,7 +696,7 @@ static int tfs_read(const char *path, char *buffer, size_t size, off_t offset, s
 
 	// Step 1: You could call get_node_by_path() to get inode from path
 	inode *pd = (inode*)malloc(sizeof(inode));
-	int ino = get_node_by_path(path, 0, pd);
+	/*int ino = */get_node_by_path(path, 0, pd);
 
 	// Step 2: Based on size and offset, read its data blocks from disk
 	/*starting info*/
@@ -735,7 +739,7 @@ static int tfs_read(const char *path, char *buffer, size_t size, off_t offset, s
 static int tfs_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info *fi) {
 	// Step 1: You could call get_node_by_path() to get inode from path
 	inode *pd = (inode*)malloc(sizeof(inode));
-	int ino = get_node_by_path(path, 0, pd);
+	/*int ino = */get_node_by_path(path, 0, pd);
 
 	// Step 2: Based on size and offset, read its data blocks from disk
 	/*starting info*/
@@ -754,11 +758,11 @@ static int tfs_write(const char *path, const char *buffer, size_t size, off_t of
 	do {
 		int blk_no = pd->direct_ptr[block];
 		if (blk_no == 0) { //uninitialized
-			pd->direct_ptr[block] = get_avail_blk();
+			pd->direct_ptr[block] = get_avail_blkno();
 			blk_no = pd->direct_ptr[block];
 			pd->size += BLOCK_SIZE - offsetInBlock;
 			pd->vstat.st_size = pd->size;
-			pd->vstat.st_blk_size++;
+			pd->vstat.st_blksize++;
 		}
 		int chk = bio_read(blk_no, blockBuf);
 		if (chk < 0) return 0; //some problem occured
@@ -794,7 +798,7 @@ static int tfs_unlink(const char *path) {
 
 	// Step 2: Call get_node_by_path() to get inode of target file
 	inode *f = (inode*)malloc(sizeof(inode));
-	int ino = get_node_by_path(path, 0, f);
+	/*int ino = */get_node_by_path(path, 0, f);
 
 	// Step 3: Clear data block bitmap of target file
 	char bitmap[BLOCK_SIZE];
@@ -823,7 +827,7 @@ static int tfs_unlink(const char *path) {
 
 	// Step 5: Call get_node_by_path() to get inode of parent directory
 	inode *pd = (inode*)malloc(sizeof(inode));
-	int ino = get_node_by_path(dirPath, 0, pd);
+	/*int ino = */get_node_by_path(dirPath, 0, pd);
 
 	// Step 6: Call dir_remove() to remove directory entry of target file in its parent directory
 	dir_remove(*pd, fileName, strlen(fileName));
@@ -854,8 +858,8 @@ static int tfs_utimens(const char *path, const struct timespec tv[2]) {
 	// But DO NOT DELETE IT!
     return 0;
 }
-
-char* dirname(char* p) {
+/*
+const char* dirname(const char* p) {
 	char* path = (char*)malloc(strlen(p) + 1);
 	strcpy(path, p);
 	int x;
@@ -865,10 +869,10 @@ char* dirname(char* p) {
 			return path;
 		}
 	}
-	return -1;
+	return p;
 }
 
-char* basename(char* p) {
+const char* basename(const char* p) {
 	char* path = (char*)malloc(strlen(p) + 1);
 	strcpy(path, p);
 	int x;
@@ -877,8 +881,9 @@ char* basename(char* p) {
 			return (path + x);
 		}
 	}
-	return -1;
+	return p;
 }
+*/
 
 static struct fuse_operations tfs_ope = {
 	.init		= tfs_init,
