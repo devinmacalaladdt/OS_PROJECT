@@ -77,7 +77,8 @@ int get_avail(int bitmap_type) {
 			continue;
 		for (y = 0; y < 8; y++) {
 			if (!((bitmap[x] >> y) & 1)) {
-				bitmap[x] &= !((bitmap[x] >> y) & 1);
+				//printf("BITMAP: %x %x %x %x\n", bitmap[x], (bitmap[x] >> y) & 1, !((bitmap[x] >> y) & 1), bitmap[x] | !((bitmap[x] >> y) & 1));
+				bitmap[x] |= (1 << y);
 				chk = bio_write(block, bitmap);
 				if (chk < 0)
 					return -1;
@@ -235,9 +236,9 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 					dir->valid = 1;
 					dir->ino = f_ino;
 					dir->len = name_len;
-					printf("DIR_ADD ADDED: %s\n", dir->name);
+					printf("DIR_ADD ADDED: %s %d\n", dir->name, (int)(dir->ino));
 					/*write new/updated dirent block to disk*/
-					memcpy((block + x * sizeof(dirent)), dir, sizeof(dirent));
+					memcpy((block + y * sizeof(dirent)), dir, sizeof(dirent));
 					chk = bio_write(dir_inode.direct_ptr[x], block);
 					free(dir);
 					if (chk < 0) return -1;
@@ -248,11 +249,11 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 					dir_inode.link++;
 					chk = writei(dir_inode.ino, &dir_inode);
 					if (chk < 0) return -1;
-					printf("READ: %d\n", (int)(dir_inode.ino));
+					/*printf("READ: %d\n", (int)(dir_inode.ino));
 					readi(dir_inode.ino, &dir_inode);
-					printf("::%d\n", dir_inode.direct_ptr[0]);
+					printf("::%d\n", dir_inode.direct_ptr[0]);*/
 					//test
-					dir = (dirent*)malloc(sizeof(dirent));
+					/*dir = (dirent*)malloc(sizeof(dirent));
 					readi(dir_inode.ino, &dir_inode);
 					bio_read(dir_inode.direct_ptr[0], block);
 					printf("READ INO: %d, READ PTR: %d\n", dir_inode.ino, dir_inode.direct_ptr[0]);
@@ -262,7 +263,7 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 					free(dir);
 					dirent d;
 					int a = dir_find(dir_inode.ino, fname, name_len, &d);
-					printf("%d\n", a);
+					printf("%d\n", a);*/
 					return 1;
 				}
 			}
@@ -585,7 +586,6 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 	// Step 4: Call dir_add() to add directory entry of target directory to parent directory
 	printf("CALL DIR_ADD - %s\n", path);
 	if(dir_add(parent, next_avail, fileName, strlen(path))==-1){
-		printf("don't fuck with this operation\n");
 		return -1;
 	}
 
@@ -624,7 +624,7 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 	// Step 6: Call writei() to write inode to disk
 	writei(next_avail,&i);
 	
-	readi(0, &parent);
+	/*readi(0, &parent);
 	char block[BLOCK_SIZE];
 	dirent *dir = (dirent*)malloc(sizeof(dirent));
 	bio_read(parent.direct_ptr[0], block);
@@ -633,7 +633,7 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 	free(dir);
 	dirent d;
 	int a = dir_find(parent.ino, fileName, strlen(fileName) + 1, &d);
-	printf("END: %d\n", a);
+	printf("END: %d\n", a);*/
 
 	return 0;
 }
