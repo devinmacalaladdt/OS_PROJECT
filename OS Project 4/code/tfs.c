@@ -334,7 +334,7 @@ int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 int tfs_mkfs() {
 
 	// Call dev_init() to initialize (Create) Diskfile
-	dev_init("a.txt");
+	dev_init(diskfile_path);
 
 	// write superblock information
 	super_block = (superblock*)(malloc(sizeof(superblock)));
@@ -414,9 +414,8 @@ int tfs_mkfs() {
  * FUSE file operations
  */
 static void *tfs_init(struct fuse_conn_info *conn) {
-
 	// Step 1a: If disk file is not found, call mkfs
-	if(dev_open("a.txt")==-1){tfs_mkfs(); return NULL;}
+	if(dev_open(diskfile_path)==-1){tfs_mkfs(); return NULL;}
 
   // Step 1b: If disk file is found, just initialize in-memory data structures
   // and read superblock from disk
@@ -424,7 +423,6 @@ static void *tfs_init(struct fuse_conn_info *conn) {
 	unsigned char buf[BLOCK_SIZE];
 	bio_read(0,buf);
 	memcpy(super_block,buf,sizeof(superblock));
-
 	return NULL;
 }
 
