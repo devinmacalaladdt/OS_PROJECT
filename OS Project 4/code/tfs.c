@@ -140,7 +140,7 @@ int writei(uint16_t ino, inode *_inode) {
  * directory operations
  */
 int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) {
-
+	printf("DIR_FIND CALLED WITH: %s %d %d\n", fname, (int)(name_len),(int)(ino));
   // Step 1: Call readi() to get the inode using ino (inode number of current directory)
 
 	inode i;
@@ -153,7 +153,7 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 	//int d = 0;//current total dirent within enitre directory
 
 	for(b=0;b<16;b++){
-		//printf("b: %d\n", b);
+		printf("ptr: %d\n", (int)(i.direct_ptr[b]));
 		if(i.direct_ptr[b]==0) continue;
 		unsigned char buf[BLOCK_SIZE];
 		bio_read(i.direct_ptr[b],buf);
@@ -162,6 +162,7 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 
 			dirent *dir = (dirent*)malloc(sizeof(dirent));
 			memcpy(dir, (buf + y * sizeof(dirent)), sizeof(dirent));
+			//printf("INFO: %s : %s\n", dir->name, fname);
 			if (dir->valid) {
 				printf("STRCMP FIND: %s : %s But INODE: %d\n", dir->name, fname, (int)(dir->ino));
 				//printf("STRCMP: %s : %s\n", dir.name, fname);
@@ -170,6 +171,13 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 					memcpy(_dirent, dir, sizeof(dirent));
 					free(dir);
 					return 0;
+
+				}
+			}
+			else {
+				if (strcmp(dir->name, fname) == 0) {
+
+					printf("TARGET FOUND: valid bit off\n");
 
 				}
 			}
@@ -185,7 +193,6 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 }
 
 int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len) {
-	printf("fill em with the venom\n");
 	if (name_len > 207)
 		return -EPERM;
 	// Step 1: Read dir_inode's data block and check each directory entry of dir_inode
@@ -246,8 +253,11 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 					printf("::%d\n", dir_inode.direct_ptr[0]);
 					//test
 					dir = (dirent*)malloc(sizeof(dirent));
-					bio_read(dir_inode.direct_ptr[x], block);
-					memcpy(dir, (block + y * sizeof(dirent)), sizeof(dirent));
+					readi(dir_inode.ino, &dir_inode);
+					bio_read(dir_inode.direct_ptr[0], block);
+					printf("READ INO: %d, READ PTR: %d\n", dir_inode.ino, dir_inode.direct_ptr[0]);
+					memcpy(dir, (block + 0 * sizeof(dirent)), sizeof(dirent));
+					printf("Y: %d\n", y);
 					printf("DIRENT: ->name: %s  ->ino: %d  ->val: %d  ->len: %d  \n", dir->name, (int)(dir->ino), (int)(dir->valid), (int)(dir->len));
 					free(dir);
 					dirent d;
@@ -333,11 +343,13 @@ int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 
 	while(tok!=NULL){
 
-		if(dir_find(ino, tok, strlen(tok), &d) !=0){
+		if(dir_find(ino, tok, strlen(tok)+1, &d) != 0){
+			printf("CRITICAL namei: %s\n", tok);
 //			printf("Invalid Path\n");
 			return -1;
 		}
 		ino = d.ino;
+		printf("WARNING namei: %s\n", tok);
 
 		tok = strtok(NULL, "/");
 
@@ -582,8 +594,8 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 	i.ino=next_avail;
 	i.vstat.st_ino=next_avail;
 	i.valid=1;
-	i.size = 0;
-	i.vstat.st_size = 0;
+	i.size = sizeof(dirent);
+	i.vstat.st_size = sizeof(dirent);
 	i.type = S_IFDIR;
 	i.vstat.st_mode = S_IFDIR | mode;
 	i.link=2;
@@ -602,16 +614,27 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 		i.direct_ptr[c]=0;
 
 	//initial block for new directory
-	int dir_next_avail = get_avail_blkno();
-	i.direct_ptr[0]=dir_next_avail;
-	unsigned char buf[BLOCK_SIZE];
-	memset(buf,0,BLOCK_SIZE);
-	bio_write(dir_next_avail,buf);
+	//int dir_next_avail = get_avail_blkno();
+	//i.direct_ptr[0]=dir_next_avail;
+	//unsigned char buf[BLOCK_SIZE];
+
+	//bio_write(dir_next_avail,buf);
 	
 
 	// Step 6: Call writei() to write inode to disk
 	writei(next_avail,&i);
 	
+	readi(0, &parent);
+	char block[BLOCK_SIZE];
+	dirent *dir = (dirent*)malloc(sizeof(dirent));
+	bio_read(parent.direct_ptr[0], block);
+	memcpy(dir, (block + 0 * sizeof(dirent)), sizeof(dirent));
+	printf("DIRENT: ->name: %s  ->ino: %d  ->val: %d  ->len: %d  \n", dir->name, (int)(dir->ino), (int)(dir->valid), (int)(dir->len));
+	free(dir);
+	dirent d;
+	int a = dir_find(parent.ino, fileName, strlen(fileName) + 1, &d);
+	printf("END: %d\n", a);
+
 	return 0;
 }
 
