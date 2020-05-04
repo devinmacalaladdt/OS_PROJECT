@@ -662,19 +662,17 @@ static int tfs_rmdir(const char *path) {
 		return -ENOENT;
 	if(parent.type!=S_IFDIR)
 		return -EPERM;
-
 	// Step 3: Clear data block bitmap of target directory
 	inode child;
 
 	if (get_node_by_path(path, 0, &child) == -1)
 		return -ENOENT;
 	if(child.type!=S_IFDIR)
-		return -1;
-
+		return -EPERM;
 	// unset data bitmap at locations taken by target directory
 	unsigned char buf[BLOCK_SIZE];
 	bio_read(super_block->d_bitmap_blk,buf);
-	int c = 0;
+	/*int c = 0;
 	for(c=0;c<16;c++){
 
 		if(child.direct_ptr[c]!=0){
@@ -683,14 +681,12 @@ static int tfs_rmdir(const char *path) {
 
 		}
 
-	}
+	}*/
 	bio_write(super_block->d_bitmap_blk,buf);
-
 	// Step 4: Clear inode bitmap and its data block
 	bio_read(super_block->i_bitmap_blk,buf);
 	unset_bitmap(buf,child.ino);
 	bio_write(super_block->i_bitmap_blk,buf);
-
 	// Step 5: Call get_node_by_path() to get inode of parent directory
 	// this was step 2?
 
