@@ -826,7 +826,8 @@ static int tfs_write(const char *path, const char *buffer, size_t size, off_t of
 	printf("WRITE\n");
 	// Step 1: You could call get_node_by_path() to get inode from path
 	inode *pd = (inode*)malloc(sizeof(inode));
-	/*int ino = */get_node_by_path(path, 0, pd);
+	if (get_node_by_path(path, 0, pd) < 0)
+		return -ENOENT;
 
 	// Step 2: Based on size and offset, read its data blocks from disk
 	/*starting info*/
@@ -882,46 +883,52 @@ static int tfs_unlink(const char *path) {
 
 	// Step 1: Use dirname() and basename() to separate parent directory path and target file name
 	char _path[strlen(path)];
-	strcpy(_path,path);
-	char * dirPath = dirname(_path); 
-	char * fileName = basename(_path);
+	strcpy(_path, path);
+	char * dirPath = dirName(_path);
+	char * fileName = baseName(_path);
 
 	// Step 2: Call get_node_by_path() to get inode of target file
-	inode *f = (inode*)malloc(sizeof(inode));
-	/*int ino = */get_node_by_path(path, 0, f);
+	inode parent;
+	if (get_node_by_path(dirPath, 0, &parent) == -1)
+		return -ENOENT;
+	if (parent.type != S_IFDIR)
+		return -EPERM;
 
 	// Step 3: Clear data block bitmap of target file
-	char bitmap[BLOCK_SIZE];
-	int chk = bio_read(super_block->d_bitmap_blk, bitmap);
-	if (chk < 0) return -1;
-	int x;
-	for (x = 0; x < 16; x++){
-		if (f->direct_ptr[x] != 0) {
-			int block = f->direct_ptr[x] / 8;
-			int offset = f->direct_ptr[x] % 8;
-			bitmap[block] &= !((bitmap[block] >> offset) & 0);
+	inode child;
+
+	if (get_node_by_path(path, 0, &child) == -1)
+		return -ENOENT;
+	if (child.type != S_IFREG)
+		return -1;
+
+	// unset data bitmap at locations taken by target directory
+	unsigned char bitmap[BLOCK_SIZE];
+	bio_read(super_block->d_bitmap_blk, bitmap);
+	int c = 0;
+	for (c = 0; c < 16; c++) {
+
+		if (child.direct_ptr[c] != 0) {
+
+			unset_bitmap(bitmap, child.direct_ptr[c] - super_block->d_bitmap_blk);
+
 		}
+
 	}
-	chk = bio_write(super_block->d_bitmap_blk, bitmap);
-	if (chk < 0) return -1;
+	if (bio_write(super_block->d_bitmap_blk, bitmap) < 0) return -1;
 
 	// Step 4: Clear inode bitmap and its data block
-	chk = bio_read(super_block->i_bitmap_blk, bitmap);
-	if (chk < 0) return -1;
-	int block = f->ino / 8;
-	int offset = f->ino % 8;
-	bitmap[block] &= !((bitmap[block] >> offset) & 0);
 
-	chk = bio_write(super_block->d_bitmap_blk, bitmap);
-	if (chk < 0) return -1;
+	bio_read(super_block->i_bitmap_blk, bitmap);
+	unset_bitmap(bitmap, child.ino);
+	bio_write(super_block->i_bitmap_blk, bitmap);
 
 	// Step 5: Call get_node_by_path() to get inode of parent directory
-	inode *pd = (inode*)malloc(sizeof(inode));
-	/*int ino = */get_node_by_path(dirPath, 0, pd);
+	
 
 	// Step 6: Call dir_remove() to remove directory entry of target file in its parent directory
-	dir_remove(*pd, fileName, strlen(fileName));
-
+	if (dir_remove(parent, fileName, strlen(fileName)) == -1)
+		return -1;
 	return 0;
 }
 
