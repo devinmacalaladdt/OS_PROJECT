@@ -154,7 +154,7 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 	//int d = 0;//current total dirent within enitre directory
 
 	for(b=0;b<16;b++){
-		printf("ptr: %d\n", (int)(i.direct_ptr[b]));
+		//printf("ptr: %d\n", (int)(i.direct_ptr[b]));
 		if(i.direct_ptr[b]==0) continue;
 		unsigned char buf[BLOCK_SIZE];
 		bio_read(i.direct_ptr[b],buf);
@@ -242,6 +242,7 @@ int dir_add(inode dir_inode, uint16_t f_ino, const char *fname, size_t name_len)
 					chk = bio_write(dir_inode.direct_ptr[x], block);
 					free(dir);
 					if (chk < 0) return -1;
+
 					/*write updated dir_inode*/
 					dir_inode.vstat.st_size += sizeof(dirent);
 					dir_inode.size += sizeof(dirent);
@@ -286,6 +287,7 @@ int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
 		return -EPERM;
 	unsigned char block[BLOCK_SIZE];
 	int x, y;
+	printf("a\n");
 	for (x = 0; x < 16; x++) {
 		if (dir_inode.direct_ptr[x] < 1) continue;
 		int chk = bio_read(dir_inode.direct_ptr[x], block);
@@ -293,22 +295,29 @@ int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
 			for (y = 0; y < BLOCK_SIZE / sizeof(dirent); y++) { //16
 				dirent *dir = (dirent*)malloc(sizeof(dirent));
 				memcpy(dir, (block + y * sizeof(dirent)), sizeof(dirent));
+				printf("b\n");
 				if (strcmp(dir->name, fname) == 0 && dir->valid == 1) {
+					printf("c\n");
 					inode *i = (inode*)malloc(sizeof(inode));
 					readi(dir->ino, i);
-					int z;
+					/*int z;
 					for (z = 0; z < 16; z++)
-						if (i->direct_ptr[z] != 0)
-							return -2; //cannot delete dir with files in it
+						if (i->direct_ptr[z] != 0) {
+							printf("YoUcAnNoTdElEtEaDiRwItHfIlEsInit\n");
+							return -11; //cannot delete dir with files in it
+						}*/
 					dir->valid = 0;
-					memcpy((block + x * sizeof(dirent)), dir, sizeof(dirent));
+					printf("Invalidated...\n");
+					memcpy((block + y * sizeof(dirent)), dir, sizeof(dirent));
 					chk = bio_write(dir_inode.direct_ptr[x], block);
 					free(i);
+					printf("Written erase::\n");
 					if (chk < 0) return -1;
 					dir_inode.vstat.st_size -= sizeof(dirent);
 					dir_inode.size -= sizeof(dirent);
 					dir_inode.vstat.st_nlink--;
 					dir_inode.link--;
+					//dir_inode.direct_ptr[x] = 0;
 					writei(dir_inode.ino, &dir_inode);
 					return 1;
 				}
@@ -320,7 +329,7 @@ int dir_remove(inode dir_inode, const char *fname, size_t name_len) {
 	// Step 2: Check if fname exist
 
 	// Step 3: If exist, then remove it from dir_inode's data block and write to disk
-
+	printf("d\n");
 	return -1;
 }
 
@@ -345,12 +354,12 @@ int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 	while(tok!=NULL){
 
 		if(dir_find(ino, tok, strlen(tok)+1, &d) != 0){
-			printf("CRITICAL namei: %s\n", tok);
+			//printf("CRITICAL namei: %s\n", tok);
 //			printf("Invalid Path\n");
 			return -1;
 		}
 		ino = d.ino;
-		printf("WARNING namei: %s\n", tok);
+		//printf("WARNING namei: %s\n", tok);
 
 		tok = strtok(NULL, "/");
 
@@ -582,6 +591,7 @@ static int tfs_mkdir(const char *path, mode_t mode) {
 
 	// Step 3: Call get_avail_ino() to get an available inode number
 	int next_avail = get_avail_ino();
+	printf("NEXT_AVAIL: %d\n", next_avail);
 
 	// Step 4: Call dir_add() to add directory entry of target directory to parent directory
 	printf("CALL DIR_ADD - %s\n", path);
@@ -643,8 +653,8 @@ static int tfs_rmdir(const char *path) {
 	// Step 1: Use dirname() and basename() to separate parent directory path and target directory name
 	char _path[strlen(path)];
 	strcpy(_path,path);
-	char * dirPath = dirname(_path); 
-	char * fileName = basename(_path);
+	char * dirPath = dirName(_path); 
+	char * fileName = baseName(_path);
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
 	inode parent;
