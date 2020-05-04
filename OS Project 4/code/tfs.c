@@ -83,8 +83,8 @@ int get_avail(int bitmap_type) {
 				if (chk < 0)
 					return -1;
 				if(bitmap_type)
-					return (x * 8 + y) + super_block->i_bitmap_blk;
-				return (x * 8 + y) + super_block->d_bitmap_blk;
+					return (x * 8 + y) + super_block->i_start_blk;
+				return (x * 8 + y) + super_block->d_start_blk;
 			}
 		}
 	}
@@ -166,7 +166,7 @@ int dir_find(uint16_t ino, const char *fname, size_t name_len, dirent *_dirent) 
 			//printf("INFO: %s : %s\n", dir->name, fname);
 			if (dir->valid) {
 				printf("STRCMP FIND: %s : %s But INODE: %d\n", dir->name, fname, (int)(dir->ino));
-				//printf("STRCMP: %s : %s\n", dir.name, fname);
+				printf("STRCMP: %s : %s\n", dir->name, fname);
 				if (strcmp(dir->name, fname) == 0) {
 
 					memcpy(_dirent, dir, sizeof(dirent));
@@ -354,12 +354,12 @@ int get_node_by_path(const char *path, uint16_t ino, inode *_inode) {
 	while(tok!=NULL){
 
 		if(dir_find(ino, tok, strlen(tok)+1, &d) != 0){
-			//printf("CRITICAL namei: %s\n", tok);
+			printf("CRITICAL namei: %s\n", tok);
 //			printf("Invalid Path\n");
 			return -1;
 		}
 		ino = d.ino;
-		//printf("WARNING namei: %s\n", tok);
+		printf("WARNING namei: %s\n", tok);
 
 		tok = strtok(NULL, "/");
 
@@ -773,7 +773,7 @@ static int tfs_open(const char *path, struct fuse_file_info *fi) {
 	inode *pd = (inode*)malloc(sizeof(inode));
 
 	// Step 2: If not found, return -1
-	if (get_node_by_path(path, 0, pd) < 1)
+	if (get_node_by_path(path, 0, pd) < 0)
 		return -ENOENT;
 	return 0;
 }
@@ -796,23 +796,26 @@ static int tfs_read(const char *path, char *buffer, size_t size, off_t offset, s
 	int blocksToRead = endBlock - block;
 	char blockBuf[BLOCK_SIZE];
 	size_t bufSize = 0;
-	int readSize;
+	int readSize = BLOCK_SIZE - offsetInBlock;
+	printf("START: %d, %d END: %d %d\n", block, offsetInBlock, endBlock, offsetInEndBlock);
 
 	do {
 		int blk_no = block + pd->direct_ptr[block];
-		int chk = bio_read(blk_no, blockBuf);
-		if (chk < 0) return 0; //some problem occured
-		readSize = BLOCK_SIZE - offsetInBlock;
+		if(bio_read(blk_no, blockBuf) < 0)
+			return -1; //some problem occured
+		
 		memcpy(buffer + bufSize, blockBuf + offsetInBlock, readSize);
-		bufSize += BLOCK_SIZE-offsetInBlock;
+		bufSize += readSize;
 		if (block + 1 == endBlock) {
 			offsetInBlock = offsetInEndBlock;
-			size = offsetInEndBlock;
+			readSize = offsetInEndBlock;
 		}
-		else
+		else {
 			offsetInBlock = 0;
+			readSize = BLOCK_SIZE;
+		}
 		block++;
-	} while (blocksToRead-- > 0);
+	} while (--blocksToRead > 0);
 
 	free(pd);
 	return bufSize;
@@ -826,9 +829,11 @@ static int tfs_write(const char *path, const char *buffer, size_t size, off_t of
 	printf("WRITE\n");
 	// Step 1: You could call get_node_by_path() to get inode from path
 	inode *pd = (inode*)malloc(sizeof(inode));
-	if (get_node_by_path(path, 0, pd) < 0)
+	if (get_node_by_path(path, 0, pd) < 0) {
+		printf("Step 1: in write is unable to find the file\n");
 		return -ENOENT;
-
+	}
+	printf("inode dump: %d %d %d %d\n", (int)(pd->direct_ptr[0]), (int)(pd->vstat.st_size), (int)(pd->vstat.st_nlink), (int)(pd->vstat.st_blocks));
 	// Step 2: Based on size and offset, read its data blocks from disk
 	/*starting info*/
 	int block = offset / BLOCK_SIZE;
@@ -841,33 +846,39 @@ static int tfs_write(const char *path, const char *buffer, size_t size, off_t of
 	int blocksToWrite = endBlock - block;
 	char blockBuf[BLOCK_SIZE];
 	size_t bufSize = 0;
-	int writeSize;
+	int writeSize = BLOCK_SIZE - offsetInBlock;
+	printf("START: %d, %d END: %d %d\n", block, offsetInBlock, endBlock, offsetInEndBlock);
 
 	do {
 		int blk_no = pd->direct_ptr[block];
 		if (blk_no == 0) { //uninitialized
 			pd->direct_ptr[block] = get_avail_blkno();
 			blk_no = pd->direct_ptr[block];
-			pd->size += BLOCK_SIZE - offsetInBlock;
-			pd->vstat.st_size = pd->size;
 			pd->vstat.st_blocks++;
+			pd->vstat.st_nlink++;
+			pd->link++;
+			printf("Spawned New Block: %d\n", pd->direct_ptr[block]);
 		}
-		int chk = bio_read(blk_no, blockBuf);
-		if (chk < 0) return 0; //some problem occured
-		writeSize = BLOCK_SIZE - offsetInBlock;
+		if(bio_read(blk_no, blockBuf) < 0)
+			return -1; //some problem occured
+
+		printf("MEMCPY: blockbuf + %d, buffer + %d, write %d\n", (int)(offsetInBlock), (int)(bufSize), (int)(writeSize));
 		memcpy(blockBuf + offsetInBlock, buffer + bufSize, writeSize);
-		bufSize += BLOCK_SIZE - offsetInBlock;
-		chk = bio_write(blk_no, blockBuf);
+		bufSize += writeSize;
+		if (bio_write(blk_no, blockBuf) < 0) return -1;
 		if (block + 1 == endBlock) {
 			offsetInBlock = offsetInEndBlock;
 			writeSize = offsetInEndBlock;
 		}
-		else
+		else {
 			offsetInBlock = 0;
+			writeSize = BLOCK_SIZE;
+		}
 		block++;
-	} while (blocksToWrite-- > 0);
-
-	writei(pd->ino, pd);
+	} while (--blocksToWrite > 0);
+	pd->size += bufSize;
+	pd->vstat.st_size = pd->size;
+	if (writei(pd->ino, pd) < 0) return -1;
 	free(pd);
 	// Step 3: Write the correct amount of data from offset to disk
 
