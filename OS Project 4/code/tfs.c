@@ -710,50 +710,58 @@ static int tfs_releasedir(const char *path, struct fuse_file_info *fi) {
 static int tfs_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
 	printf("CREATE\n");
 	// Step 1: Use dirname() and basename() to separate parent directory path and target file name
-	char _path[strlen(path)];
-	strcpy(_path,path);
-	char * dirPath = dirname(_path); 
-	char * fileName = basename(_path);
+	char* _path = (char*)malloc(strlen(path) + 1);
+	strcpy(_path, path);
+	char * dirPath = dirName(_path);
+	char * fileName = baseName(_path);
+	printf("PATH: %s, _PATH: %s, DIR: %s, BASE: %s\n", path, _path, dirPath, fileName);
 
 	// Step 2: Call get_node_by_path() to get inode of parent directory
-	inode *pd = (inode*)malloc(sizeof(inode));
-	/*int ino = */get_node_by_path(dirPath, 0, pd);
+	inode parent;
+	if (get_node_by_path(dirPath, 0, &parent) == -1) {
+		return -ENOENT;
+	}
+	if (parent.type != S_IFDIR) {
+		return -EPERM;
+	}
 
 	// Step 3: Call get_avail_ino() to get an available inode number
-	int availino = get_avail_ino();
+	int next_avail = get_avail_ino();
+	printf("NEXT_AVAIL: %d\n", next_avail);
 	
 	// Step 4: Call dir_add() to add directory entry of target file to parent directory
-	if (dir_add(*pd, availino, fileName, strlen(fileName)) < 0)
+	printf("CALL DIR_ADD - %s\n", path);
+	if (dir_add(parent, next_avail, fileName, strlen(path)) == -1) {
 		return -1;
-
+	}
+	printf("FILE ADD SUCCESS!\n");
 	// Step 5: Update inode for target file
-	inode *i = (inode*)malloc(sizeof(inode));
-	/*initialize inode*/
-	i->ino = availino;
-	i->valid = 1;
-	i->size = 0;
-	i->type = S_IFREG;
+	inode i;
+	i.ino = next_avail;
+	i.vstat.st_ino = next_avail;
+	i.valid = 1;
+	i.size = 0;
+	i.vstat.st_size = 0;
+	i.type = S_IFREG;
+	i.vstat.st_mode = S_IFREG | mode;
+	i.link = 1;
+	i.vstat.st_nlink = 1;
+	i.vstat.st_blksize = BLOCK_SIZE;
+	i.vstat.st_blocks = 0;
+	i.vstat.st_gid = getgid();
+	i.vstat.st_uid = getuid();
+	time(&(i.vstat.st_atime));
+	time(&(i.vstat.st_ctime));
+	time(&(i.vstat.st_mtime));
 	int x;
 	for (x = 0; x < 16; x++) {
 		if (x % 2 == 0)
-			i->indirect_ptr[x / 2] = 0;
-		i->direct_ptr[x] = 0;
+			i.indirect_ptr[x / 2] = 0;
+		i.direct_ptr[x] = 0;
 	}
-	i->vstat.st_ino = availino;
-	i->vstat.st_size = 0;
-	i->vstat.st_mode = S_IFREG | mode;
-	i->link = 1;
-	i->vstat.st_nlink = 1;
-	i->vstat.st_blksize = BLOCK_SIZE;
-	i->vstat.st_blocks = 0;
-	i->vstat.st_gid = getgid();
-	i->vstat.st_uid = getuid();
-	time(&(i->vstat.st_atime));
-	time(&(i->vstat.st_ctime));
-	time(&(i->vstat.st_mtime));
 
 	// Step 6: Call writei() to write inode to disk
-	int chk = writei(availino, i);
+	int chk = writei(next_avail, &i);
 	if (chk < 0)
 		return -1;
 	return 0;
